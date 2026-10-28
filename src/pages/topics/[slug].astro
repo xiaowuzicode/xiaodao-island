@@ -1,0 +1,45 @@
+---
+/** 单个专题：这个话题下的全部文章，最新的在前。 */
+import { getCollection } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { TOPICS, topicsOf, type Topic } from '@/lib/topics';
+import { breadcrumbLd } from '@/lib/seo';
+
+export async function getStaticPaths() {
+  const posts = (await getCollection('posts')).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+  return TOPICS.map((topic) => ({
+    params: { slug: topic.slug },
+    props: { topic, list: posts.filter((p) => topicsOf(p.data.title, p.data.summary).includes(topic.slug)) },
+  })).filter((x) => x.props.list.length > 0);
+}
+
+const { topic, list } = Astro.props as { topic: Topic; list: Awaited<ReturnType<typeof getCollection<'posts'>>> };
+const fmt = (d: Date) => d.toISOString().slice(0, 10);
+const others = TOPICS.filter((t) => t.slug !== topic.slug);
+const ld = [
+  {
+    '@context': 'https://schema.org', '@type': 'CollectionPage', name: `${topic.name} · 小岛AI`, description: topic.desc,
+    url: `https://xiaodao.ai/topics/${topic.slug}/`, inLanguage: 'zh-CN', numberOfItems: list.length,
+  },
+  breadcrumbLd([['小岛', '/'], ['专题', '/topics/'], [topic.name, `/topics/${topic.slug}/`]]),
+];
+---
+
+<Base title={`${topic.name}：${list.length} 篇文章 · 小岛AI`} description={`${topic.desc}小岛AI 在这个话题下的 ${list.length} 篇文章。`} jsonLd={ld}>
+  <PageHero place="岛刊社 · 专题" title={topic.name} desc={topic.desc}>
+    <div class="chips"><span>{list.length} 篇</span><a href="/topics/">全部专题</a></div>
+  </PageHero>
+  <div class="arch">
+    <ul class="log">
+      {list.map((post) => (
+        <li>
+          <div class="date">{fmt(post.data.pubDate)}</div>
+          <h2><a href={`/posts/${post.id}/`}>{post.data.title}</a></h2>
+          <p>{post.data.summary}</p>
+        </li>
+      ))}
+    </ul>
+  </div>
+  <p class="chips other-topics">{others.map((t) => <a href={`/topics/${t.slug}/`}>{t.name}</a>)}</p>
+</Base>

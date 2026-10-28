@@ -1,0 +1,22 @@
+---
+/** B 站最近作品的封面网格。limit 不给就全放。 */
+import { RECENT_VIDEOS, videoCover, videoUrl } from '@/island/videos';
+
+interface Props {
+  limit?: number;
+}
+const { limit } = Astro.props;
+const list = limit ? RECENT_VIDEOS.slice(0, limit) : RECENT_VIDEOS;
+---
+
+<ul class="video-grid">
+  {list.map((v) => (
+    <li>
+      <a href={videoUrl(v.bvid)} target="_blank" rel="noopener noreferrer">
+        <span class="thumb"><img src={videoCover(v.bvid)} alt="" width="480" height="300" loading="lazy" decoding="async" /><span class="play" aria-hidden="true">▶</span></span>
+        <span class="v-title">{v.title}</span>
+        <span class="v-date">B 站 · {v.date}</span>
+      </a>
+    </li>
+  ))}
+</ul>

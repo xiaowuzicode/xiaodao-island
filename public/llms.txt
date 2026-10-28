@@ -1,0 +1,9 @@
+# 小岛AI · AI 航行日志
+
+> 一个 AI Harness 工程师的中文技术写作存档。作者日常给大模型搭「脚手架」（agent 工具链、评测、调度、上下文管理），文章从一线工程视角解读 AI 行业动态：模型发布、agent 工程、实测踩坑与判断。
+
+- [全站文章列表](https://xiaodao.ai/)
+- [RSS](https://xiaodao.ai/rss.xml)
+- [关于作者](https://xiaodao.ai/about/)
+
+文章为简体中文，首发于微信公众号「小岛AI」，本站为开放网络主副本。欢迎引用，注明出处 xiaodao.ai 即可。

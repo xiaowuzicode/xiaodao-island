@@ -1,0 +1,68 @@
+{
+  "videos": [
+    {
+      "bvid": "BV1Crnt6rEaH",
+      "title": "API Key 是什么？为什么千万不能发到网上？",
+      "date": "2026-10-27"
+    },
+    {
+      "bvid": "BV15kxN6gEge",
+      "title": "搞懂 Git Worktree，再 Vibe Coding：一个仓库，几个 AI 同时干活",
+      "date": "2026-10-27"
+    },
+    {
+      "bvid": "BV1r2nt6TE9y",
+      "title": "部署是什么？为什么你电脑上能打开，别人打不开？",
+      "date": "2026-10-27"
+    },
+    {
+      "bvid": "BV19gJB6UEdq",
+      "title": "Git 是什么？给代码装上\"游戏存档\"",
+      "date": "2026-10-26"
+    },
+    {
+      "bvid": "BV1egJB6UEXq",
+      "title": "AI 说要\"前端加后端加数据库\"，到底是什么意思？",
+      "date": "2026-10-25"
+    },
+    {
+      "bvid": "BV1cFHu6DEtk",
+      "title": "Agent 装上 Remotion，能做哪些动画？7 个场景直接看效果",
+      "date": "2026-10-25"
+    },
+    {
+      "bvid": "BV1VGJB67ELR",
+      "title": "终端是什么？为什么 AI 编程工具都住在一个黑窗口里？",
+      "date": "2026-10-24"
+    },
+    {
+      "bvid": "BV1YGJB67EsS",
+      "title": "Vibe Coding 到底是什么？不会写代码，真能做出软件吗？",
+      "date": "2026-10-23"
+    },
+    {
+      "bvid": "BV1vpHm6EEhY",
+      "title": "AI 公司为什么抢显卡，不抢 CPU？｜动画讲透",
+      "date": "2026-10-23",
+      "series": "pencil"
+    },
+    {
+      "bvid": "BV1QtH16TEcA",
+      "title": "AI 显示的\"思考过程\"，是它真正的想法吗？",
+      "date": "2026-10-22",
+      "series": "pencil"
+    },
+    {
+      "bvid": "BV14vH16aEdg",
+      "title": "AI 怎么知道\"喵星人\"就是猫？搜相册打\"海边\"，它是怎么找到照片的？",
+      "date": "2026-10-22",
+      "series": "pencil"
+    },
+    {
+      "bvid": "BV14qH16cEVe",
+      "title": "视频通话里的\"熟人\"，可能是 AI 换的脸？怎么一眼识破？",
+      "date": "2026-10-21",
+      "series": "pencil"
+    }
+  ]
+}

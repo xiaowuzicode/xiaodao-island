@@ -1,0 +1,5 @@
+# 小岛AI · xiaodao.ai：欢迎搜索引擎和 AI 检索抓取全部公开内容
+User-agent: *
+Allow: /
+
+Sitemap: https://xiaodao.ai/sitemap-index.xml

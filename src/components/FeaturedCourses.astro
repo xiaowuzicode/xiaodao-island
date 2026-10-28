@@ -1,0 +1,32 @@
+---
+/** 主推课程：固定排在最前面的课程大卡片。已上线的可以点进 B 站课堂，未上线的标「即将上架」。 */
+import { FEATURED, videoUrl } from '@/island/videos';
+
+interface Props {
+  /** compact：日报页顶部用的窄条版。 */
+  compact?: boolean;
+}
+const { compact = false } = Astro.props;
+---
+
+<div class:list={['courses', { compact }]}>
+  {FEATURED.map((c) => {
+    const Tag = c.url ? 'a' : 'div';
+    return (
+      <Tag class:list={['course', { soon: !c.url }]} href={c.url ?? undefined} target={c.url ? '_blank' : undefined} rel={c.url ? 'noopener noreferrer' : undefined}>
+        <img src={c.cover} alt={`${c.title} 封面`} width="720" height="450" loading="lazy" decoding="async" />
+        <div class="course-text">
+          <span class="badge">{c.status}</span>
+          <h3>{c.title}</h3>
+          {!compact && <p>{c.subtitle}</p>}
+          {c.url ? <span class="go">去 B 站看课程 →</span> : <span class="go muted">上架后这里会出现购买入口</span>}
+        </div>
+      </Tag>
+    );
+  })}
+</div>
+{!compact && FEATURED.some((c) => c.trailer) && (
+  <p class="course-trailer">
+    先看看：{FEATURED.filter((c) => c.trailer).map((c, i) => <>{i > 0 && ' · '}<a href={videoUrl(c.trailer as string)} target="_blank" rel="noopener noreferrer">{c.trailerLabel ?? '免费预告'} ↗</a></>)}
+  </p>
+)}

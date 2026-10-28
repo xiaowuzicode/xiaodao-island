@@ -1,0 +1,113 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import {
+  loadIssues,
+  groupByCategory,
+  CATEGORY_EN,
+  weekdayZh,
+} from '@/lib/daily';
+
+export async function getStaticPaths() {
+  const issues = loadIssues();
+  return issues.map((issue) => ({
+    params: { date: issue.date },
+    props: { issue },
+  }));
+}
+
+const { issue } = Astro.props;
+
+const allPosts = await getCollection('posts');
+const dayPosts = allPosts
+  .filter((p) => {
+    const d = p.data.pubDate;
+    const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return ds === issue.date;
+  })
+  .sort((a, b) => a.id.localeCompare(b.id));
+
+const lead = dayPosts[0];
+const seconds = dayPosts.slice(1);
+const groups = groupByCategory(issue.items);
+const [y, m, d] = issue.date.split('-');
+---
+
+<Base
+  title={`小岛AI 日报 · 总第 ${issue.issueNo} 期（${issue.date}）`}
+  description={`${issue.date} 的 AI 信号简报，${issue.items.length} 条信号，每条带一句话判断。`}
+>
+  <section class="np-masthead panel">
+    <h1 class="np-title">小岛<span class="np-dot">AI</span> 日报</h1>
+    <div class="np-sub">
+      <span class="np-issue">总第 {issue.issueNo} 期</span>
+      <span>{y} 年 {m} 月 {d} 日 · {weekdayZh(issue.date)}</span>
+      <span>{issue.items.length} 条信号</span>
+    </div>
+  </section>
+  <div class="np-dateline">
+    <span>XIAODAO AI DAILY</span>
+    <span>捕捉信号，附带判断</span>
+  </div>
+
+  {
+    lead && (
+      <section class="np-lead">
+        <div class="np-kicker">头版 · 本日长文</div>
+        <h2>
+          <a href={`/posts/${lead.id}/`}>{lead.data.title}</a>
+        </h2>
+        <p class="np-standfirst">{lead.data.summary}</p>
+        <a class="np-more" href={`/posts/${lead.id}/`}>读全文 →</a>
+      </section>
+    )
+  }
+  {
+    seconds.length > 0 && (
+      <section class="np-second">
+        {seconds.map((p) => (
+          <div>
+            <h3>
+              <a href={`/posts/${p.id}/`}>{p.data.title}</a>
+            </h3>
+            <p>{p.data.summary}</p>
+          </div>
+        ))}
+      </section>
+    )
+  }
+
+  {
+    groups.map(([cat, items]) => (
+      <section>
+        <div class="np-section-head">
+          <span class="t">{cat}</span>
+          <span class="rule" />
+          <span class="en">{CATEGORY_EN[cat]}</span>
+        </div>
+        <div class="np-grid">
+          {items.map((it) => (
+            <article class="np-item">
+              <span class="np-cat">{cat}</span>
+              <h4>
+                <a href={it.url} rel="noopener nofollow" target="_blank">
+                  {it.title}
+                </a>
+              </h4>
+              <p class="np-note">{it.note}</p>
+              <div class="np-meta">
+                {it.source}
+                {it.verdict === 'written' && (
+                  <span class="np-written">✎ 已成文</span>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    ))
+  }
+
+  <div class="np-foot">本期完 · 明早邮船再来</div>
+  <p class="np-back"><a href="/daily/">← 全部期数</a></p>
+</Base>

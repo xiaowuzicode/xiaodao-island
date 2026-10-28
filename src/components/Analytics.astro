@@ -1,0 +1,15 @@
+---
+/**
+ * Vercel Web Analytics：只统计访问量、页面、来源、设备，不用 cookie、不识别个人。
+ * 直接用 Vercel 在站点上提供的 /_vercel/insights/script.js，不额外引 npm 包。
+ * 本地开发时这个路径不存在，所以只在线上构建里输出。
+ */
+const enabled = import.meta.env.PROD;
+---
+
+{enabled && (
+  <>
+    <script is:inline>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+    <script is:inline defer src="/_vercel/insights/script.js"></script>
+  </>
+)}

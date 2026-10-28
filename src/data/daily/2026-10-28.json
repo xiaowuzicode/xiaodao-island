@@ -1,0 +1,5 @@
+{"date":"2026-10-28","items":[
+ {"title":"示例条目：日报每条是一条信号","url":"https://xiaodao.ai/daily/","source":"示例来源","category":"产品","note":"每条带一句话判断，写在 note 里。","at":"2026-10-28T01:00:00Z","verdict":"candidate"},
+ {"title":"示例条目：写成长文的那条会带上链接","url":"https://xiaodao.ai/","source":"示例来源","category":"模型","note":"verdict 是 written 的条目，页面上会标出已成文。","at":"2026-10-28T02:00:00Z","verdict":"written"},
+ {"title":"示例条目：分类决定它出现在哪一栏","url":"https://xiaodao.ai/","source":"示例来源","category":"技巧","note":"category 取 模型 / 产品 / 行业 / 研究 / 技巧。","at":"2026-10-28T03:00:00Z","verdict":"candidate"}
+]}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "headers": [
+    {
+      "source": "/posts/:slug/:dir(images|imgs)/:file*",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=2592000, stale-while-revalidate=31536000" }]
+    },
+    {
+      "source": "/:dir(island|videos)/:file*",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=2592000" }]
+    },
+    {
+      "source": "/:file(favicon.svg|favicon-32.png|apple-touch-icon.png|icon-512.png|portrait.png)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=2592000" }]
+    }
+  ]
+}

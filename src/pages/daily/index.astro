@@ -1,0 +1,41 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import FeaturedCourses from '@/components/FeaturedCourses.astro';
+import VideoGrid from '@/components/VideoGrid.astro';
+import { loadIssues } from '@/lib/daily';
+
+const issues = loadIssues();
+---
+
+<Base
+  title="小岛AI 日报 · 归档"
+  description="每天一期的 AI 信号简报，每条都带一线工程师的一句话判断。"
+>
+  <PageHero place="日报邮船 · DAILY MAIL" title="小岛AI 日报" desc="每天一期的 AI 信号简报，每条都带一线工程师的一句话判断。">
+    <div class="chips"><span>已出版 {issues.length} 期</span><a href="/daily/book/">翻页册 →</a></div>
+  </PageHero>
+
+  <section class="block">
+    <div class="block-head"><h2>主推课程</h2><span class="en">COURSES</span></div>
+    <FeaturedCourses compact />
+  </section>
+  <section class="block">
+    <div class="block-head"><h2>B 站最近更新</h2><span class="en">LATEST</span><a class="more" href="/videos/">全部课程与视频 →</a></div>
+    <VideoGrid limit={4} />
+  </section>
+
+  <div class="block-head"><h2>往期日报</h2><span class="en">ARCHIVE</span></div>
+  <ul class="np-archive">
+    {
+      issues.map((issue) => (
+        <li>
+          <span class="no">总第 {issue.issueNo} 期</span>
+          <span class="d">{issue.date}</span>
+          <a href={`/daily/${issue.date}/`}>{issue.items[0]?.title ?? '本期简报'}</a>
+          <span class="n">等 {issue.items.length} 条信号</span>
+        </li>
+      ))
+    }
+  </ul>
+</Base>

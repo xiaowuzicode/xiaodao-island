@@ -1,0 +1,24 @@
+---
+/** 视频页：上面是固定的主推课程，下面是 B 站最近更新。 */
+import Base from '@/layouts/Base.astro';
+import FeaturedCourses from '@/components/FeaturedCourses.astro';
+import PageHero from '@/components/PageHero.astro';
+import VideoGrid from '@/components/VideoGrid.astro';
+import { BILIBILI_SPACE, RECENT_VIDEOS } from '@/island/videos';
+---
+
+<Base title="课程与视频 · 小岛AI" description="小岛AI 的视频课和 B 站动画：拆开开源 Pi 的 Agent 课、Agent 工程课，以及大模型基础彩铅系列。">
+  <PageHero place="放映台 · CINEMA" title="课程与视频" desc="彩铅动画讲 AI：一套套成体系的课放在最前面，下面是 B 站最近的更新。">
+    <div class="chips"><a href={BILIBILI_SPACE} target="_blank" rel="noopener noreferrer">B 站主页 ↗</a><span>最近 {RECENT_VIDEOS.length} 个作品</span></div>
+  </PageHero>
+
+  <section class="block">
+    <div class="block-head"><h2>主推课程</h2><span class="en">COURSES</span></div>
+    <FeaturedCourses />
+  </section>
+
+  <section class="block">
+    <div class="block-head"><h2>B 站最近更新</h2><span class="en">LATEST</span><a class="more" href={BILIBILI_SPACE} target="_blank" rel="noopener noreferrer">全部作品 ↗</a></div>
+    <VideoGrid />
+  </section>
+</Base>

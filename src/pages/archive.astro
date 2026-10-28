@@ -1,0 +1,47 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+
+const posts = (await getCollection('posts')).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+const p = (n: number) => String(n).padStart(2, '0');
+const fmt = (d: Date) => `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+const monthKey = (d: Date) => `${d.getFullYear()}-${p(d.getMonth() + 1)}`;
+
+const groups = new Map<string, typeof posts>();
+for (const post of posts) {
+  const k = monthKey(post.data.pubDate);
+  if (!groups.has(k)) groups.set(k, []);
+  groups.get(k)!.push(post);
+}
+const months = [...groups.entries()];
+---
+
+<Base title="全部文章 · 小岛AI" description={`小岛AI 全部 ${posts.length} 篇文章，按月归档。`}>
+  <PageHero place="岛刊社 · ISLAND PRESS" title="全部文章" desc={`${posts.length} 篇，按月归档，最新的在最上面。`}>
+    <div class="chips"><span>{months.length} 个月</span><a href="/topics/">按专题看</a><a href="/daily/">日报</a><a href="/daily/book/">翻页册</a></div>
+  </PageHero>
+  {
+    months.map(([m, list], i) => (
+      <details class="arch" open={i === 0}>
+        <summary>
+          <b>{m}</b>
+          <span>{list.length} 篇</span>
+        </summary>
+        <ul class="log">
+          {list.map((post) => (
+            <li>
+              <div class="date">{fmt(post.data.pubDate)}</div>
+              <h2>
+                <a href={`/posts/${post.id}/`}>{post.data.title}</a>
+              </h2>
+              <p>{post.data.summary}</p>
+            </li>
+          ))}
+        </ul>
+      </details>
+    ))
+  }
+</Base>

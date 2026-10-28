@@ -1,0 +1,49 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+---
+
+<Base title="关于 · 小岛AI">
+  <PageHero place="岛主小屋 · ISLAND KEEPER" title="关于岛主" desc="AI Harness 工程师，在创业公司给大模型搭脚手架。" />
+  <div class="about-grid">
+    <section class="panel">
+      <h2 class="panel-h">关于我 <span class="en">ABOUT ME</span></h2>
+      <div class="panel-b">
+        <p>
+          你好，我是「小岛AI」的作者，一名在创业公司做 AI Harness
+          的工程师。日常工作是给大模型搭「脚手架」，包括 agent
+          的工具链、评测、调度、上下文管理，这些让模型真正能把活干完的工程层。
+        </p>
+        <p>
+          这个站是我公众号文章的开放网络存档。写的东西大体是一类：AI
+          行业里正在发生的事，从一个天天看模型在生产环境里怎么跑、怎么翻车的人的视角，聊聊它到底改变了什么。有实测，有踩坑，有判断，偶尔有冷水。
+        </p>
+      </div>
+    </section>
+
+    <div class="stack">
+      <section class="panel">
+        <h2 class="panel-h">为什么有这个站 <span class="en">WHY</span></h2>
+        <div class="panel-b">
+          <p>
+            平台上的内容只有使用权，没有主权。这里是主副本，公众号是分发渠道。顺便，开放的网页才能被搜索引擎和
+            AI 检索到，微信生态里的文章不能。
+          </p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2 class="panel-h">订阅 <span class="en">SUBSCRIBE</span></h2>
+        <div class="panel-b">
+          <ul class="kv">
+            <li><span>微信</span> 搜索公众号「小岛AI」，或扫下面的码</li>
+            <li><span>B 站</span> <a href="https://space.bilibili.com/108463642">胖胖不胖的AI小岛 ↗</a></li>
+            <li><span>RSS</span> <a href="/rss.xml">/rss.xml ↗</a></li>
+            <li><span>给 AI 读</span> <a href="/llms.txt">/llms.txt ↗</a></li>
+          </ul>
+          <img class="qr" src="/island/wechat-qr.jpg" width="160" height="160" alt="公众号「小岛AI」二维码" loading="lazy" />
+        </div>
+      </section>
+    </div>
+  </div>
+</Base>

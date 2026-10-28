@@ -1,0 +1,28 @@
+---
+/** 404：在海上迷航了。把人接回岛上——最新文章、专题和几个常用入口。 */
+import { getCollection } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+
+/** 列几篇最新文章。 */
+const LATEST = 5;
+const posts = (await getCollection('posts')).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()).slice(0, LATEST);
+---
+
+<Base title="迷航了 · 小岛AI" description="这个地址在海图上找不到。">
+  <PageHero place="404 · 海图上没有这里" title="在海上迷航了" desc="这个地址在海图上找不到，可能是链接打错了，或者这页已经搬了家。">
+    <div class="chips"><a href="/">回到小岛</a><a href="/archive/">全部文章</a><a href="/topics/">专题</a><a href="/daily/">日报</a></div>
+  </PageHero>
+  <div class="block-head"><h2>最近靠岸的文章</h2><span class="en">LATEST</span></div>
+  <div class="arch">
+    <ul class="log">
+      {posts.map((post) => (
+        <li>
+          <div class="date">{post.data.pubDate.toISOString().slice(0, 10)}</div>
+          <h2><a href={`/posts/${post.id}/`}>{post.data.title}</a></h2>
+          <p>{post.data.summary}</p>
+        </li>
+      ))}
+    </ul>
+  </div>
+</Base>

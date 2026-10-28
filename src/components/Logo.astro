@@ -1,0 +1,11 @@
+---
+/**
+ * 站标（灯塔小岛）直接写进页面，不再单独请求 /favicon.svg：国内访问 Vercel 时多一个请求就多一次失败的机会，
+ * 失败了左上角只剩一个破图标。图案仍以 public/favicon.svg 为准，构建时读进来。
+ */
+import { readFileSync } from 'node:fs';
+
+const svg = readFileSync('public/favicon.svg', 'utf8').replace(/\s*\n\s*/g, '');
+const src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+---
+<img src={src} alt="" width="28" height="28" />

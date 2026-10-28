@@ -1,0 +1,443 @@
+---
+/**
+ * 首页：3D 小岛。电脑上直接上岛；手机和省流量模式先给一张静态岛图，点一下才加载 3D。
+ * 3D 没跑起来时（手机静态图、WebGL 不可用），底部航海图照样能点开内容卡；没有 JS 时 dock 退化成普通链接。
+ */
+import { getCollection } from 'astro:content';
+import { loadIssues } from '@/lib/daily';
+import { LINKS, PLACES, type IslandData } from '@/island/content';
+import Analytics from '@/components/Analytics.astro';
+import { ldJson, websiteLd } from '@/lib/seo';
+import { FEATURED } from '@/island/videos';
+import { TOPICS, topicsOf } from '@/lib/topics';
+import { POSTER_LQIP } from '@/island/poster-lqip';
+import Logo from '@/components/Logo.astro';
+
+const posts = (await getCollection('posts')).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const issues = loadIssues();
+const latest = issues[0];
+const fmt = (d: Date) => d.toISOString().slice(0, 10);
+const trim = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+/** 卡片里最多展示几篇最新文章、几条日报标题。 */
+const LATEST_POSTS = 6;
+const DAILY_HEADLINES = 4;
+/** 给码头钓鱼的岛民随机「钓」出的旧文章数量（从 30 天前往回均匀取）。 */
+const ARCHIVE_SAMPLE = 40;
+const ARCHIVE_AFTER_DAYS = 30;
+
+const data: IslandData = {
+  posts: posts.slice(0, LATEST_POSTS).map((p) => ({
+    title: p.data.title, summary: trim(p.data.summary, 96), date: fmt(p.data.pubDate), url: `/posts/${p.id}/`,
+  })),
+  postCount: posts.length,
+  daily: latest ? {
+    date: latest.date, issueNo: latest.issueNo, count: latest.items.length, url: `/daily/${latest.date}/`,
+    headlines: latest.items.slice(0, DAILY_HEADLINES).map((i) => i.title),
+  } : null,
+  issueCount: issues.length,
+  archive: (() => {
+    const cutoff = Date.now() - ARCHIVE_AFTER_DAYS * 86_400_000;
+    const old = posts.filter((p) => p.data.pubDate.valueOf() < cutoff);
+    const step = Math.max(1, Math.floor(old.length / ARCHIVE_SAMPLE));
+    return old.filter((_, i) => i % step === 0).slice(0, ARCHIVE_SAMPLE)
+      .map((p) => ({ title: p.data.title, url: `/posts/${p.id}/`, date: fmt(p.data.pubDate) }));
+  })(),
+  topics: TOPICS.map((t) => {
+    // posts 已按时间倒序，第一篇命中的就是这个专题最新的一篇
+    const list = posts.filter((p) => topicsOf(p.data.title, p.data.summary).includes(t.slug));
+    const top = list[0];
+    return { slug: t.slug, name: t.name, count: list.length, url: `/topics/${t.slug}/`, latest: top ? { title: top.data.title, url: `/posts/${top.id}/` } : null };
+  }),
+};
+// 地点 → 不开 3D 时的直达链接（dock 是真链接：搜索引擎和没开 3D 的人都能用）
+const PLACE_HREF: Record<string, string> = {
+  lighthouse: data.posts[0]?.url ?? '/archive/', press: '/archive/', keeper: '/about/', shipyard: LINKS.piCourse,
+  cinema: LINKS.bilibili, market: '/topics/', next: '/about/', pencil: LINKS.bilibili,
+};
+const dock = PLACES.filter((p) => p.dock);
+const title = '小岛AI · 一座记录 AI 实战的小岛';
+const description = `给大模型搭脚手架的工程师，记录一线实战、踩坑与判断。岛上有 ${data.postCount} 篇文章、${data.issueCount} 期日报和几套视频课。`;
+const canonical = new URL('/', Astro.site);
+---
+
+<!doctype html>
+<html lang="zh-CN" data-island="boot">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#cfe7e3" />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="application/rss+xml" title="小岛AI" href="/rss.xml" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <!-- 分享卡片用 JPG（1200×630）：部分平台不认 WebP 预览图 -->
+    <meta property="og:image" content={new URL('/island/og.jpg', Astro.site)} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preload" as="image" href="/island/poster-wide.webp" media="(min-width: 721px)" />
+    <link rel="preload" as="image" href="/island/poster-tall.webp" media="(max-width: 720px)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="小岛AI" />
+    <meta property="og:locale" content="zh_CN" />
+    <script type="application/ld+json" set:html={ldJson(websiteLd(description))} />
+    <Analytics />
+  </head>
+  <body class="isl">
+    <div id="isl-stage" class="isl-stage">
+      <picture class="isl-poster" style={`--isl-lqip-wide: url(${POSTER_LQIP.wide}); --isl-lqip-tall: url(${POSTER_LQIP.tall})`}>
+        <source media="(max-width: 720px)" srcset="/island/poster-tall.webp" />
+        <img src="/island/poster-wide.webp" alt="小岛AI 的 3D 小岛：红白灯塔、岛刊社、码头和两座卫星小岛" decoding="async" onerror="this.hidden = true" />
+      </picture>
+      <canvas id="isl-canvas" class="isl-canvas" tabindex="0" aria-label="可旋转的 3D 小岛。拖动旋转，滚轮或双指缩放，方向键也可以转；点岛上任意位置镜头会飞过去并拉近，点建筑会打开它。"></canvas>
+      <div id="isl-labels" class="isl-labels"></div>
+    </div>
+
+    <!-- 岛上内容的文字版：3D 画面搜索引擎看不懂，这里把同样的内容用文字列出来（读屏软件也能读到），视觉上不显示 -->
+    <main class="isl-sr">
+      <h1>小岛AI · 一座记录 AI 实战的小岛</h1>
+      <p>{description}</p>
+      <h2>最新文章</h2>
+      <ul>{data.posts.map((p) => <li><a href={p.url}>{p.title}</a>（{p.date}）：{p.summary}</li>)}</ul>
+      {data.daily && <p><a href={data.daily.url}>小岛AI 日报第 {data.daily.issueNo} 期（{data.daily.date}）</a>，共 {data.issueCount} 期，<a href="/daily/">全部日报</a>。</p>}
+      <h2>课程</h2>
+      <ul>{FEATURED.map((c) => <li>{c.url ? <a href={c.url}>{c.title}</a> : c.title}（{c.status}）：{c.subtitle}</li>)}</ul>
+      <p><a href="/archive/">全部 {data.postCount} 篇文章</a> · <a href="/topics/">专题</a> · <a href="/videos/">课程与视频</a> · <a href="/about/">关于岛主</a> · <a href="/rss.xml">RSS</a></p>
+    </main>
+
+    <header class="isl-top">
+      <a href="/" class="isl-brand" aria-label="小岛AI 首页">
+        <Logo />
+        <span><b>小岛AI</b><small>AI 航行日志</small></span>
+      </a>
+      <nav class="isl-nav" aria-label="主导航">
+        <a href="/videos/">视频</a>
+        <a href="/archive/">文章</a>
+        <a href="/daily/">日报</a>
+        <a href="/about/">关于</a>
+      </nav>
+      <button id="isl-sound" class="isl-chip isl-sound" type="button" aria-pressed="false" title="打开海浪声">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 14c2.2 0 2.2-2.5 4.4-2.5s2.2 2.5 4.4 2.5 2.2-2.5 4.4-2.5 2.2 2.5 4.4 2.5" /><path d="M2.5 18.5c2.2 0 2.2-2.5 4.4-2.5s2.2 2.5 4.4 2.5 2.2-2.5 4.4-2.5 2.2 2.5 4.4 2.5" /><path class="isl-sound-off" d="M4 4l16 16" /></svg>
+        <span>海浪声</span>
+      </button>
+      <div class="isl-time-wrap">
+        <button id="isl-time" class="isl-chip" type="button" aria-haspopup="true" aria-expanded="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" /><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M5.3 18.7 7 17M17 7l1.7-1.7" /></svg>
+          <span id="isl-time-label">本地时间</span>
+        </button>
+        <div id="isl-time-menu" class="isl-menu" hidden>
+          <button type="button" data-hour="auto">跟随本地时间</button>
+          <button type="button" data-hour="6.5">清晨</button>
+          <button type="button" data-hour="12">正午</button>
+          <button type="button" data-hour="18">黄昏</button>
+          <button type="button" data-hour="22">夜晚</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="isl-views" role="group" aria-label="视角">
+      <button type="button" data-view="all" aria-pressed="true">全岛</button>
+      <button type="button" data-view="harbor" aria-pressed="false">港湾</button>
+      <button type="button" data-view="cape" aria-pressed="false">灯塔岬</button>
+      <button type="button" data-view="sea" aria-pressed="false">群岛航线</button>
+    </div>
+
+    <nav class="isl-dock" aria-label="航海图：岛上的地点">
+      {dock.map((p) => <a href={PLACE_HREF[p.id] ?? '/archive/'} data-place={p.id}><i class={`dot dot-${p.id}`}></i>{p.name}</a>)}
+    </nav>
+
+    <aside id="isl-card" class="isl-card" hidden aria-labelledby="isl-card-title">
+      <button id="isl-card-close" class="isl-card-close" type="button" aria-label="关闭">×</button>
+      <div id="isl-card-eyebrow" class="isl-eyebrow"></div>
+      <h2 id="isl-card-title" tabindex="-1"></h2>
+      <p id="isl-card-lede"></p>
+      <figure id="isl-card-figure" class="isl-figure" hidden><img id="isl-card-img" alt="" /><figcaption id="isl-card-caption"></figcaption></figure>
+      <ul id="isl-card-items" class="isl-items"></ul>
+      <a id="isl-card-cta" class="isl-cta" href="/"><span id="isl-card-cta-label"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></a>
+      <div id="isl-card-links" class="isl-links"></div>
+      <p id="isl-card-note" class="isl-note"></p>
+    </aside>
+
+    <!-- 放映台的播放窗：嵌 B 站播放器放完整视频（src/island/player.ts） -->
+    <dialog id="isl-player" class="isl-player" aria-labelledby="isl-player-title">
+      <div class="isl-player-head">
+        <strong id="isl-player-title"></strong>
+        <a id="isl-player-out" href="https://space.bilibili.com/108463642" target="_blank" rel="noopener noreferrer">去 B 站看</a>
+        <button id="isl-player-close" type="button" aria-label="关闭播放">×</button>
+      </div>
+      <iframe id="isl-player-frame" title="B 站视频播放器" allow="autoplay; fullscreen; picture-in-picture; encrypted-media"></iframe>
+    </dialog>
+
+    <div class="isl-enter">
+      <button id="isl-enter" type="button">登岛 · 进入 3D</button>
+      <small>约 0.6MB，流量下也能打开</small>
+    </div>
+    <p id="isl-announce" class="isl-sr" aria-live="polite"></p>
+    <p class="isl-hint">拖动旋转 · 滚轮缩放 · 点哪儿飞到哪儿</p>
+    <p class="isl-fallback">这台设备暂时打不开 3D 小岛。点下方航海图照样能看内容，或者直接去 <a href="/archive/">全部文章</a> 和 <a href="/daily/">日报</a>。</p>
+    <p class="isl-loading">小岛正在浮出水面…</p>
+
+    <noscript><p class="isl-fallback" style="display:block">小岛需要 JavaScript 才能显示 3D。可以直接看 <a href="/archive/">全部文章</a> 和 <a href="/daily/">日报</a>。</p></noscript>
+    <script id="isl-data" type="application/json" set:html={JSON.stringify(data).replace(/</g, '\\u003c')} />
+
+    <script>
+      import { MOBILE_MAX_WIDTH } from '@/island/config';
+      // three 0.180 只支持 WebGL2：只认 WebGL2，检测完立刻释放这个临时上下文
+      const glOk = (() => {
+        try {
+          const gl = document.createElement('canvas').getContext('webgl2');
+          gl?.getExtension('WEBGL_lose_context')?.loseContext();
+          return !!gl;
+        } catch (e) {
+          console.warn('[island] 检测 WebGL2 失败', e);
+          return false;
+        }
+      })();
+      const root = document.documentElement;
+      const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+      const preferPoster = matchMedia(`(max-width: ${MOBILE_MAX_WIDTH}px)`).matches || conn?.saveData === true;
+      /** 没进 3D 时（手机静态图 / 设备不支持）：只加载轻量的卡片控件，让航海图能点开内容卡。 */
+      let lite: AbortController | null = null;
+      /** 3D 已接手：之后才加载完的轻量卡片控件直接作废，不跟 3D 的控件抢。 */
+      let took3d = false;
+      /** 已经在加载或已经装好：3D 失败退回时不再装第二份（否则点一下会开两次卡片）。 */
+      let liteLoading = false;
+      async function liteCards() {
+        if (liteLoading) return;
+        liteLoading = true;
+        let mods;
+        try {
+          mods = await Promise.all([import('@/island/ui'), import('@/island/content')]);
+        } catch (e) {
+          liteLoading = false; // 下载失败允许下次再试
+          throw e;
+        }
+        const [{ UI }, { placeById }] = mods;
+        if (took3d) return;
+        const raw = document.getElementById('isl-data')?.textContent;
+        if (!raw) throw new Error('[island] 缺少 #isl-data 数据块');
+        const data = JSON.parse(raw);
+        lite = new AbortController();
+        const ui: InstanceType<typeof UI> = new UI({
+          onPlace: (id) => { const p = placeById(id); if (p) { ui.open(p.card(data)); ui.markPlace(id); } },
+          onView: () => {},
+          onTime: () => {},
+          onClose: () => { ui.close(); ui.markPlace(null); },
+        }, lite.signal);
+      }
+      async function enter() {
+        root.dataset.island = 'loading';
+        try {
+          // 3D 包较大，网络慢时要下载好一阵：下载期间航海图先用轻量卡片控件，下载完再交给 3D 里的正式控件
+          const m = await import('@/island/main');
+          took3d = true;
+          lite?.abort();
+          document.getElementById('isl-card')?.setAttribute('hidden', '');
+          m.start();
+        } catch (e) {
+          console.error('[island] 3D 启动失败，退回静态岛图', e);
+          root.dataset.island = 'fallback';
+          liteCards().catch((err) => console.error('[island] 内容卡也没能加载', err));
+        }
+      }
+      // 海浪声：第一次点才加载合成代码；不支持 WebAudio 就把按钮藏起来
+      const soundBtn = document.getElementById('isl-sound');
+      let ambient: { toggle(): Promise<boolean>; state(): string } | null | undefined;
+      soundBtn?.addEventListener('click', async () => {
+        try {
+          if (ambient === undefined) ambient = (await import('@/island/ambient')).createAmbient();
+          if (!ambient) { soundBtn.hidden = true; return; }
+          const on = await ambient.toggle();
+          soundBtn.setAttribute('aria-pressed', String(on));
+          soundBtn.title = on ? '关闭海浪声' : '打开海浪声';
+          if (location.search.includes('island-debug')) Object.assign(window, { __ambient: ambient });
+        } catch (e) {
+          console.error('[island] 海浪声启动失败', e);
+          soundBtn.hidden = true;
+        }
+      });
+      const startLite = () => liteCards().catch((e) => console.error('[island] 内容卡加载失败，航海图退化为普通链接', e));
+      if (!glOk) { root.dataset.island = 'fallback'; startLite(); }
+      else if (preferPoster) {
+        root.dataset.island = 'poster';
+        startLite();
+        document.getElementById('isl-enter')?.addEventListener('click', enter);
+      } else {
+        startLite();
+        enter();
+      }
+    </script>
+
+    <style is:global>
+      :root {
+        --isl-panel: rgba(252, 248, 238, 0.93);
+        --isl-solid: #fcf8ee;
+        --isl-ink: #23413b;
+        --isl-muted: #62776f;
+        --isl-line: rgba(35, 65, 59, 0.12);
+        --isl-pick: #2f5d55;
+        --isl-pick-ink: #fcf8ee;
+        --isl-chip: #efeee0;
+        --isl-accent: #d65a4a;
+        --isl-shadow: 0 8px 28px rgba(30, 64, 58, 0.12);
+        --isl-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+        --isl-gutter: 16px;
+        /* 横屏刘海：左右再让出安全区 */
+        --isl-left: calc(var(--isl-gutter) + env(safe-area-inset-left, 0px));
+        --isl-right: calc(var(--isl-gutter) + env(safe-area-inset-right, 0px));
+        color-scheme: light;
+      }
+      [hidden] { display: none !important; }
+      .isl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; }
+      .isl-card h2:focus { outline: none; }
+      html, body.isl { height: 100%; margin: 0; overflow: hidden; }
+      body.isl { background: #cfe7e3; color: var(--isl-ink); font: 14px/1.5 var(--isl-sans); -webkit-font-smoothing: antialiased; }
+      .isl a { color: inherit; }
+      .isl :focus-visible { outline: 2px solid var(--isl-accent); outline-offset: 2px; }
+
+      .isl-stage { position: fixed; inset: 0; }
+      .isl-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; opacity: 0; transition: opacity 0.6s ease; }
+      .isl-canvas:active { cursor: grabbing; }
+      /* 大图没到之前先铺模糊缩略图；大图下载失败也不显示替代文字（color: transparent） */
+      .isl-poster { position: absolute; inset: 0; overflow: hidden; }
+      .isl-poster::before { content: ''; position: absolute; inset: -40px; background: var(--isl-lqip-wide) center / cover no-repeat; filter: blur(16px); transition: opacity 0.6s ease; }
+      @media (max-width: 720px) { .isl-poster::before { background-image: var(--isl-lqip-tall); } }
+      .isl-poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; color: transparent; transition: opacity 0.6s ease; }
+      [data-island='ready'] .isl-canvas { opacity: 1; }
+      [data-island='ready'] .isl-poster img, [data-island='ready'] .isl-poster::before { opacity: 0; pointer-events: none; }
+      .isl-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+      
+      .isl-label {
+        position: absolute; left: 0; top: 0; pointer-events: auto; will-change: transform;
+        border: 1px solid var(--isl-line); background: var(--isl-solid); color: var(--isl-ink);
+        font: 600 12px/1 var(--isl-sans); padding: 7px 10px; border-radius: 10px; cursor: pointer; white-space: nowrap;
+        box-shadow: 0 3px 12px rgba(25, 58, 54, 0.14); transition: background 0.15s, color 0.15s;
+      }
+      .isl-label::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: inherit; border: 1px solid var(--isl-line); }
+      .isl-label:hover, .isl-label.is-on { background: var(--isl-pick); color: var(--isl-pick-ink); }
+      .isl-bubble {
+        position: absolute; left: 0; top: 0; max-width: 240px; padding: 8px 12px 9px; border-radius: 14px 14px 14px 4px;
+        background: #fffdf6; color: var(--isl-ink); font: 500 12.5px/1.5 var(--isl-sans); text-decoration: none;
+        box-shadow: 0 6px 18px rgba(25, 58, 54, 0.18); pointer-events: auto; animation: isl-pop 0.25s ease; will-change: transform;
+      }
+      .isl-bubble b { display: block; color: var(--isl-accent); font-size: 11.5px; margin-bottom: 1px; }
+      .isl-bubble.has-link::after { content: ' →'; color: var(--isl-pick); font-weight: 700; }
+      .isl-bubble.has-link:hover { background: #f3f1e4; }
+      @keyframes isl-pop { from { opacity: 0; } }
+      .isl-label.is-boat { background: #fff4dc; border-color: rgba(214, 90, 74, 0.35); }
+      .isl-label.is-boat.is-on, .isl-label.is-boat:hover { background: var(--isl-accent); color: #fff; }
+
+      .isl-top {
+        position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: var(--isl-left); right: var(--isl-right);
+        display: flex; align-items: center; gap: 12px; pointer-events: none;
+        z-index: 6; /* 时间菜单要盖在内容卡上面 */
+      }
+      .isl-top > * { pointer-events: auto; }
+      .isl-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; background: var(--isl-panel); border: 1px solid var(--isl-line); border-radius: 16px; padding: 8px 14px 8px 10px; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+      .isl-brand img { border-radius: 8px; }
+      .isl-brand b { display: block; font-size: 15px; letter-spacing: 0.02em; }
+      .isl-brand small { display: block; font-size: 11px; color: var(--isl-muted); letter-spacing: 0.06em; }
+      .isl-nav { display: flex; gap: 2px; background: var(--isl-panel); border: 1px solid var(--isl-line); border-radius: 14px; padding: 4px; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+      .isl-nav a { text-decoration: none; padding: 8px 12px; border-radius: 10px; font-weight: 500; }
+      .isl-nav a:hover { background: var(--isl-chip); }
+      .isl-sound { margin-left: auto; }
+      .isl-sound[aria-pressed='true'] { background: var(--isl-pick); color: var(--isl-pick-ink); }
+      .isl-sound[aria-pressed='true'] .isl-sound-off { display: none; }
+      .isl-time-wrap { position: relative; }
+      .isl-chip { display: flex; align-items: center; gap: 8px; border: 1px solid var(--isl-line); background: var(--isl-panel); color: var(--isl-ink); font: 500 13px/1 var(--isl-sans); padding: 10px 14px; border-radius: 14px; cursor: pointer; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-variant-numeric: tabular-nums; }
+      .isl-chip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+      .isl-menu { position: absolute; right: 0; top: calc(100% + 8px); display: grid; min-width: 150px; padding: 6px; background: var(--isl-solid); border: 1px solid var(--isl-line); border-radius: 14px; box-shadow: var(--isl-shadow); }
+      .isl-menu button { text-align: left; border: 0; background: transparent; color: var(--isl-ink); font: 500 13px/1 var(--isl-sans); padding: 10px 12px; border-radius: 9px; cursor: pointer; }
+      .isl-menu button:hover { background: var(--isl-chip); }
+      .isl-menu button[aria-pressed='true'] { background: var(--isl-pick); color: var(--isl-pick-ink); }
+
+      .isl-views { position: fixed; top: calc(76px + env(safe-area-inset-top, 0px)); right: var(--isl-right); display: flex; gap: 2px; padding: 4px; background: var(--isl-panel); border: 1px solid var(--isl-line); border-radius: 14px; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+      .isl-views button { border: 0; background: transparent; color: var(--isl-ink); font: 500 13px/1 var(--isl-sans); padding: 9px 12px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
+      .isl-views button:hover { background: var(--isl-chip); }
+      .isl-views button[aria-pressed='true'] { background: var(--isl-pick); color: var(--isl-pick-ink); }
+
+      .isl-dock {
+        position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+        display: flex; gap: 2px; padding: 5px; max-width: calc(100vw - 2 * var(--isl-gutter)); overflow-x: auto; scrollbar-width: none;
+        background: var(--isl-panel); border: 1px solid var(--isl-line); border-radius: 16px; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      }
+      .isl-dock::-webkit-scrollbar { display: none; }
+      .isl-dock a { display: flex; align-items: center; gap: 7px; text-decoration: none; font-weight: 500; padding: 10px 14px; border-radius: 11px; white-space: nowrap; }
+      .isl-dock a:hover { background: var(--isl-chip); }
+      .isl-dock a[aria-current='true'] { background: var(--isl-pick); color: var(--isl-pick-ink); }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--isl-pick); flex: none; }
+      .dot-lighthouse { background: #d65a4a; } .dot-press { background: #e9b350; } .dot-keeper { background: #5aa58c; }
+      .dot-shipyard { background: #3f88a6; } .dot-cinema { background: #23413b; } .dot-market { background: #b5482f; } .dot-next { background: #e9b350; } .dot-pencil { background: #e9b350; }
+
+      .isl-card {
+        position: fixed; top: calc(128px + env(safe-area-inset-top, 0px)); right: var(--isl-right); width: 360px; max-height: calc(100% - 228px); overflow-y: auto;
+        padding: 20px 22px; background: var(--isl-solid); border: 1px solid var(--isl-line); border-radius: 20px; box-shadow: var(--isl-shadow);
+        animation: isl-in 0.28s ease;
+      }
+      @keyframes isl-in { from { opacity: 0; transform: translateY(8px); } }
+      .isl-card-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--isl-chip); color: var(--isl-muted); font-size: 18px; line-height: 1; cursor: pointer; }
+      .isl-eyebrow { font-size: 11px; letter-spacing: 0.12em; color: var(--isl-muted); font-weight: 600; padding-right: 36px; }
+      .isl-card h2 { margin: 6px 0 8px; font-size: 22px; line-height: 1.3; text-wrap: balance; padding-right: 20px; }
+      .isl-card p { margin: 0 0 14px; color: var(--isl-muted); }
+      .isl-figure { margin: 0 0 16px; display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 14px; background: #f3f1e4; }
+      .isl-figure img { border-radius: 10px; background: #fff; flex: none; }
+      .isl-figure figcaption { color: var(--isl-muted); font-size: 13px; line-height: 1.6; }
+      .isl-items { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 6px; }
+      .isl-items a, .isl-items div { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: #f3f1e4; text-decoration: none; }
+      .isl-items a:hover { background: #e9ecdc; }
+      .isl-item-title { font-weight: 600; line-height: 1.45; }
+      .isl-item-play .isl-item-title::before { content: '▶'; display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 50%; background: var(--isl-accent); color: #fff; font-size: 10px; vertical-align: 1px; }
+      .isl-items a.isl-item-play { background: #fbe9dc; }
+      .isl-items a.isl-item-play:hover { background: #f8dccb; }
+      .isl-player { width: min(960px, calc(100vw - 2 * var(--isl-gutter))); padding: 0; border: 0; border-radius: 18px; background: #111; color: #fff; overflow: hidden; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45); }
+      .isl-player::backdrop { background: rgba(10, 24, 22, 0.72); }
+      .isl-player-head { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; font-size: 14px; }
+      .isl-player-head strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+      .isl-player-head a { color: #ffd9c9; font-size: 13px; white-space: nowrap; }
+      .isl-player-head button { width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.12); color: #fff; font-size: 18px; line-height: 1; cursor: pointer; }
+      .isl-player iframe { display: block; width: 100%; aspect-ratio: 16 / 9; border: 0; background: #000; }
+      .isl-item-sub { font-size: 12px; color: var(--isl-muted); font-variant-numeric: tabular-nums; }
+      .isl-cta { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-decoration: none; background: var(--isl-pick); color: var(--isl-pick-ink) !important; font-weight: 600; padding: 13px 16px; border-radius: 13px; }
+      .isl-cta:hover { background: #264d46; }
+      .isl-cta svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .isl-links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 13px; }
+      .isl-links a { color: var(--isl-pick); font-weight: 500; }
+      .isl-note { font-size: 12.5px; margin: 12px 0 0 !important; }
+
+      .isl-enter, .isl-hint, .isl-fallback, .isl-loading { display: none; }
+      [data-island='poster'] .isl-enter { display: grid; justify-items: center; gap: 6px; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+      /* 静态图模式下打开了内容卡，就先把「登岛」按钮收起来，别挡住卡片 */
+      .isl-card:not([hidden]) ~ .isl-enter { display: none !important; }
+      .isl-enter button { border: 0; background: var(--isl-pick); color: var(--isl-pick-ink); font: 600 16px/1 var(--isl-sans); padding: 16px 26px; border-radius: 16px; box-shadow: var(--isl-shadow); cursor: pointer; }
+      .isl-enter small { color: var(--isl-ink); background: var(--isl-panel); padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+      [data-island='ready'] .isl-hint { display: block; position: fixed; left: var(--isl-left); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); margin: 0; padding: 7px 12px; font-size: 12px; color: var(--isl-muted); background: var(--isl-panel); border-radius: 10px; animation: isl-fade 1s ease 9s forwards; }
+      @keyframes isl-fade { to { opacity: 0; visibility: hidden; } }
+      [data-island='fallback'] .isl-fallback, [data-island='lost'] .isl-fallback { display: block; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(420px, calc(100vw - 32px)); margin: 0; padding: 16px 18px; background: var(--isl-solid); border-radius: 16px; box-shadow: var(--isl-shadow); text-align: center; }
+      [data-island='loading'] .isl-loading { display: block; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 10px 16px; background: var(--isl-panel); border-radius: 999px; color: var(--isl-muted); }
+      /* 3D 没跑起来时，只有 3D 才能用的控件（视角、时间、路牌）都不显示 */
+      html:not([data-island='ready']) .isl-views, html:not([data-island='ready']) .isl-time-wrap, html:not([data-island='ready']) .isl-labels { display: none; }
+
+      /* 与 src/island/config.ts 的 MOBILE_MAX_WIDTH 保持一致（CSS 里没法引用常量） */
+      @media (max-width: 720px) {
+        :root { --isl-gutter: 12px; }
+        .isl-nav { display: none; }
+        .isl-brand { padding: 6px 12px 6px 8px; }
+        .isl-chip { padding: 9px 12px; }
+        .isl-views { top: auto; right: auto; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+        .isl-dock { left: var(--isl-left); right: var(--isl-right); transform: none; }
+        .isl-card { top: auto; left: var(--isl-left); right: var(--isl-right); width: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); max-height: 56%; border-radius: 20px; }
+        [data-island='ready'] .isl-hint { display: none; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .isl-canvas, .isl-poster img, .isl-poster::before { transition: none; }
+        .isl-card { animation: none; }
+      }
+    </style>
+  </body>
+</html>

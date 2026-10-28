@@ -1,0 +1,1488 @@
+---
+import { loadIssues, weekdayZh, CATEGORY_EN, type DailyIssue } from '../lib/daily';
+
+interface Props {
+  kicker?: string;
+  showIndex?: boolean;
+}
+const { kicker = '日报翻页册 · 拖动书页翻阅，最新一期在最前', showIndex = true } = Astro.props;
+
+// 最新 9 期做成一本翻页册；第一跨页是最新一期，往后翻回到过去
+const issues = loadIssues().slice(0, 9);
+
+function esc(s: string) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// CJK 按 1 个单位、ASCII 按 0.54 个单位估宽，做逐行折行
+function units(ch: string) {
+  return ch.charCodeAt(0) > 0x2e7f ? 1 : 0.54;
+}
+function wrapText(text: string, maxUnits: number, maxLines: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  let w = 0;
+  for (const ch of text) {
+    const u = units(ch);
+    if (w + u > maxUnits) {
+      lines.push(line);
+      if (lines.length === maxLines) {
+        lines[maxLines - 1] = lines[maxLines - 1].replace(/.$/, '…');
+        return lines;
+      }
+      line = ch === ' ' ? '' : ch;
+      w = ch === ' ' ? 0 : u;
+    } else {
+      line += ch;
+      w += u;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function clip(text: string, maxUnits: number): string {
+  let w = 0;
+  let out = '';
+  for (const ch of text) {
+    w += units(ch);
+    if (w > maxUnits) return out.replace(/.$/, '') + '…';
+    out += ch;
+  }
+  return out;
+}
+
+/* 一期日报 → 一张 1760×1240 的跨页 SVG（书的纸张、装订、内容全部烤进图里）。
+   版面比例与翻页引擎的常数捆绑：纸面横向 5.1%–94.9%、纵向 21.8%–78.2%，
+   书缝在正中 —— 改这里要连同引擎的 SPAN / --pg 一起改。 */
+const SERIF = `Georgia,'Songti SC','Noto Serif SC','STSong','SimSun',serif`;
+const INK = '#2a2b2e';
+const SOFT = '#6a6d72';
+const FAINT = '#9a9c9f';
+const CORAL = '#c9532a';
+const PAPER = '#fdfaf1';
+const EDGE = '#e3d9c6';
+
+function spreadSVG(issue: DailyIssue): string {
+  const [y, m, d] = issue.date.split('-');
+  const leads = issue.items.slice(0, 3);
+  const rest = issue.items.slice(3);
+  const restShown = rest.slice(0, 11);
+  const restMore = rest.length - restShown.length;
+
+  let t = '';
+  // ---------- 左页：报头 + 头版三条 ----------
+  const LX = 150; // 左页内容左缘
+  let yy = 372;
+  t += `<text x="${LX}" y="${yy}" font-size="58" font-weight="700" fill="${INK}">小岛<tspan fill="${CORAL}">AI</tspan> 日报</text>`;
+  yy += 44;
+  t += `<text x="${LX}" y="${yy}" font-size="20" letter-spacing="3" fill="${SOFT}">总第 ${issue.issueNo} 期 · ${y} 年 ${m} 月 ${d} 日 · ${esc(weekdayZh(issue.date))} · ${issue.items.length} 条信号</text>`;
+  yy += 26;
+  t += `<rect x="${LX}" y="${yy}" width="640" height="4" fill="${INK}"/>`;
+  t += `<rect x="${LX}" y="${yy + 8}" width="640" height="1.5" fill="${INK}"/>`;
+  yy += 46;
+
+  for (const it of leads) {
+    const cat = esc(it.category);
+    const catEn = esc(CATEGORY_EN[it.category] ?? 'SIGNAL');
+    t += `<text x="${LX}" y="${yy}" font-size="17" letter-spacing="4" fill="${CORAL}">${catEn} · ${cat}</text>`;
+    yy += 36;
+    for (const ln of wrapText(it.title, 24.5, 2)) {
+      t += `<text x="${LX}" y="${yy}" font-size="27" font-weight="600" fill="${INK}">${esc(ln)}</text>`;
+      yy += 37;
+    }
+    yy += 2;
+    const noteLines = wrapText(it.note, 30, 2);
+    t += `<rect x="${LX}" y="${yy - 17}" width="4" height="${noteLines.length * 29 - 8}" fill="${CORAL}" opacity=".55"/>`;
+    for (const ln of noteLines) {
+      t += `<text x="${LX + 16}" y="${yy}" font-size="20" fill="${SOFT}">${esc(ln)}</text>`;
+      yy += 29;
+    }
+    yy += 30;
+  }
+  t += `<text x="${LX}" y="944" font-size="16" letter-spacing="3" fill="${FAINT}">第 ${issue.issueNo} 页</text>`;
+
+  // ---------- 右页：其余信号精简列表 ----------
+  const RX = 946; // 右页内容左缘
+  let ry = 372;
+  t += `<text x="${RX}" y="${ry}" font-size="20" letter-spacing="5" fill="${SOFT}">更多信号 · MORE SIGNALS</text>`;
+  ry += 20;
+  t += `<rect x="${RX}" y="${ry}" width="580" height="1.5" fill="${INK}" opacity=".55"/>`;
+  ry += 44;
+  for (const it of restShown) {
+    t += `<circle cx="${RX + 6}" cy="${ry - 7}" r="4" fill="${CORAL}"/>`;
+    t += `<text x="${RX + 24}" y="${ry}" font-size="21.5" fill="${INK}">${esc(clip(it.title, 27))}</text>`;
+    ry += 40;
+  }
+  if (restMore > 0) {
+    t += `<text x="${RX + 24}" y="${ry}" font-size="19" fill="${FAINT}">……还有 ${restMore} 条，读本期完整版</text>`;
+  }
+  t += `<text x="${RX}" y="944" font-size="16" letter-spacing="4" fill="${FAINT}">XIAODAO AI DAILY · xiaodao.ai/daily</text>`;
+
+  // ---------- 书本体 ----------
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1760 1240" font-family="${SERIF}">
+<defs>
+<linearGradient id="gl" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0" stop-color="#3a2c14" stop-opacity="0"/><stop offset="1" stop-color="#3a2c14" stop-opacity=".22"/>
+</linearGradient>
+<linearGradient id="gr" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0" stop-color="#3a2c14" stop-opacity=".18"/><stop offset="1" stop-color="#3a2c14" stop-opacity="0"/>
+</linearGradient>
+</defs>
+<g>
+  <rect x="96" y="282" width="1568" height="694" rx="6" fill="#efe6d2"/>
+  <rect x="93" y="278" width="1572" height="694" rx="6" fill="#f6efdd"/>
+  <rect x="90" y="270" width="788" height="700" rx="6" fill="${PAPER}" stroke="${EDGE}" stroke-width="2"/>
+  <rect x="882" y="270" width="788" height="700" rx="6" fill="${PAPER}" stroke="${EDGE}" stroke-width="2"/>
+  <rect x="760" y="270" width="120" height="700" fill="url(#gl)"/>
+  <rect x="882" y="270" width="120" height="700" fill="url(#gr)"/>
+  <rect x="878" y="270" width="8" height="700" fill="#4a3c26" opacity=".28"/>
+  ${t}
+</g>
+</svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+const spreads = issues.map((issue) => {
+  const [, m, d] = issue.date.split('-');
+  return {
+    url: spreadSVG(issue),
+    title: `总第 ${issue.issueNo} 期 · ${Number(m)} 月 ${Number(d)} 日 · ${weekdayZh(issue.date)}`,
+    date: issue.date,
+    lead: issue.items[0]?.title ?? '本期简报',
+    count: issue.items.length,
+    issueNo: issue.issueNo,
+  };
+});
+---
+
+<section class="bk-hero" id="bkHero">
+  <p class="bk-kicker">{kicker}</p>
+
+    <div class="bk-wrap" id="bkWrap">
+      <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <filter id="bk-mblur-1"><feGaussianBlur stdDeviation="5 0"></feGaussianBlur></filter>
+        <filter id="bk-mblur-2"><feGaussianBlur stdDeviation="14 0"></feGaussianBlur></filter>
+      </svg>
+      <div class="bk-stage" id="bkStage">
+        <button class="bk-arrow left" id="bkLeft" aria-label="上一期（更新）">
+          <svg viewBox="0 0 14 44" width="14" height="44" fill="none" aria-hidden="true"><polyline points="11,3 3,22 11,41" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="bk-3d" id="bk3d">
+          <div class="bk-tilt" id="bkTilt">
+            <div class="bk-cast ambient" aria-hidden="true"></div>
+            <div class="bk-cast contact" aria-hidden="true"></div>
+            <div class="bk-book" id="bkBook"></div>
+          </div>
+          <div class="zoomwrap" id="zoomWrap" aria-hidden="true"><div class="zoominner" id="zoomInner"></div></div>
+          <div class="loupe" id="loupe"><span class="grip"></span><span class="ring"><span class="lens" id="loupeLens"></span></span></div>
+        </div>
+        <button class="bk-arrow right" id="bkRight" aria-label="下一期（更早）">
+          <svg viewBox="0 0 14 44" width="14" height="44" fill="none" aria-hidden="true"><polyline points="3,3 11,22 3,41" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="bk-captions" id="bkCaptions"></div>
+      <a class="bk-read" id="bkRead" href="/daily/">读本期完整版 →</a>
+      <div class="bk-tools" role="group" aria-label="缩放">
+        <button class="tool" id="zOut" aria-label="缩小"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8.6" cy="8.6" r="5.6"/><path d="M12.8 12.8 17.4 17.4M6.2 8.6h4.8"/></svg></button>
+        <span class="zoom-read" id="zRead">100%</span>
+        <button class="tool" id="zIn" aria-label="放大"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8.6" cy="8.6" r="5.6"/><path d="M12.8 12.8 17.4 17.4M6.2 8.6h4.8M8.6 6.2v4.8"/></svg></button>
+        <span class="tool-sep" aria-hidden="true"></span>
+        <button class="tool" id="loupeBtn" aria-label="放大镜" aria-pressed="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8.8" cy="8.8" r="5.8"/><path d="M13 13l4.4 4.4"/><path d="M6.4 7.2a3.2 3.2 0 0 1 2.4-1.4" opacity=".55"/></svg></button>
+      </div>
+      <p class="bk-hint" id="bkHint">拖动书页翻阅 · 拖动放大镜细看 · ← → 方向键</p>
+  </div>
+</section>
+
+{
+  showIndex && (
+    <section class="bk-plates">
+      <p class="bk-label">册内九期</p>
+      <ol class="bk-plate-list" id="bkPlateList" />
+      <p class="bk-foot">
+        <a href="/daily/">看全部归档 →</a>
+      </p>
+    </section>
+  )
+}
+
+<style is:global>
+  .bk-hero {
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    padding: clamp(18px, 3vh, 40px) 0 clamp(28px, 4vh, 56px);
+    overflow: hidden;
+    background:
+      radial-gradient(60% 50% at 50% 12%, rgba(233, 98, 51, 0.05), transparent 70%),
+      radial-gradient(50% 45% at 12% 85%, rgba(34, 58, 94, 0.05), transparent 70%);
+  }
+  .bk-hero,
+  .bk-hero * {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .bk-kicker {
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    margin: 0 0 clamp(14px, 2.4vh, 28px);
+  }
+  .bk-wrap {
+    display: grid;
+    justify-items: center;
+    gap: 14px;
+    width: 100%;
+    position: relative;
+  }
+  .bk-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    position: relative;
+    touch-action: pan-y;
+  }
+  .bk-arrow {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 2px;
+    border: 0;
+    background: transparent;
+    color: var(--faint);
+    cursor: pointer;
+    transition: color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 8;
+  }
+  .bk-arrow:hover {
+    color: var(--ink);
+  }
+  .bk-3d {
+    position: relative;
+    flex: 1 1;
+    min-width: 0;
+    max-width: 1100px;
+    perspective: 1750px;
+    perspective-origin: 50% 46%;
+  }
+  .bk-tilt {
+    position: relative;
+    transform-style: preserve-3d;
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) scale(var(--zoom, 1));
+    will-change: transform;
+  }
+  .bk-book {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1760/1240;
+    transform-style: preserve-3d;
+    z-index: 1;
+  }
+  .bk-book img {
+    -webkit-user-drag: none;
+  }
+  .bk-cast {
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .bk-cast.ambient {
+    left: 5%;
+    right: 5%;
+    top: 27%;
+    bottom: 2%;
+    background: radial-gradient(
+      50% 50% at 50% 58%,
+      rgba(58, 44, 26, 0.3) 0%,
+      rgba(58, 44, 26, 0.16) 40%,
+      rgba(58, 44, 26, 0) 74%
+    );
+    filter: blur(26px);
+    opacity: calc(1 - var(--shade, 0) * 0.42);
+  }
+  .bk-cast.contact {
+    left: 9%;
+    right: 9%;
+    top: 62%;
+    bottom: 10%;
+    background: radial-gradient(
+      50% 44% at 50% 42%,
+      rgba(44, 32, 14, 0.34) 0%,
+      rgba(44, 32, 14, 0.14) 48%,
+      rgba(44, 32, 14, 0) 78%
+    );
+    filter: blur(11px);
+    opacity: calc(1 - var(--shade, 0) * 0.5);
+  }
+  .bk-full {
+    position: absolute;
+    inset: 0;
+  }
+  .bk-full img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .bk-half {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+  .bk-half.left {
+    left: 0;
+  }
+  .bk-half.right {
+    left: 50%;
+  }
+  .bk-half-img {
+    width: 200%;
+    max-width: none;
+    height: auto;
+    display: block;
+  }
+  .bk-half-img.right {
+    margin-left: -100%;
+  }
+  .gutter-shade {
+    position: absolute;
+    top: var(--pg, 21.8%);
+    bottom: var(--pg, 21.8%);
+    width: 46%;
+    pointer-events: none;
+    opacity: calc(var(--shade, 0) * 0.62);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5.2%, #000 94.8%, transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 5.2%, #000 94.8%, transparent 100%);
+  }
+  .gutter-shade.left {
+    right: 0;
+    background: linear-gradient(270deg, rgba(52, 38, 20, 0.3), rgba(52, 38, 20, 0) 82%);
+  }
+  .gutter-shade.right {
+    left: 0;
+    background: linear-gradient(90deg, rgba(52, 38, 20, 0.24), rgba(52, 38, 20, 0) 82%);
+  }
+  /* 翻动的书页：嵌套窄条链拼出的弯曲面（几何来自 MengTo/sketchbook） */
+  .curl {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: calc(var(--bw, 0px) * var(--span));
+    transform-style: preserve-3d;
+    z-index: 6;
+  }
+  .curl.next {
+    left: 50%;
+    transform-origin: left center;
+    transform: rotateY(calc(-1 * var(--tt, 0deg)));
+  }
+  .curl.prev {
+    right: 50%;
+    transform-origin: right center;
+    transform: rotateY(var(--tt, 0deg));
+  }
+  .strip {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: calc(var(--bw, 0px) * var(--span) / var(--n));
+    transform-style: preserve-3d;
+  }
+  .curl.next .strip {
+    transform-origin: left center;
+  }
+  .curl.prev .strip {
+    transform-origin: right center;
+  }
+  .curl.next > .strip {
+    left: 0;
+  }
+  .curl.prev > .strip {
+    right: 0;
+    left: auto;
+  }
+  .curl.next .strip .strip {
+    left: 100%;
+    transform: rotateY(var(--td, 0deg));
+  }
+  .curl.prev .strip .strip {
+    right: 100%;
+    transform: rotateY(calc(-1 * var(--td, 0deg)));
+  }
+  .face {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: -1.1px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    background-repeat: no-repeat;
+    background-size: var(--bw, 0px) auto;
+  }
+  .face.back {
+    transform: rotateY(180deg);
+  }
+  .face .sh,
+  .face .gl {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 5.2%, #000 94.8%, transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 5.2%, #000 94.8%, transparent 100%);
+  }
+  .strip.edge .face .sh,
+  .strip.edge .face .gl {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 91%, transparent 100%), var(--hf);
+    mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 91%, transparent 100%), var(--hf);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .curl.next .strip.edge .face.front,
+  .curl.prev .strip.edge .face.back {
+    --hf: linear-gradient(90deg, #000 0 22%, transparent 96%);
+  }
+  .curl.next .strip.edge .face.back,
+  .curl.prev .strip.edge .face.front {
+    --hf: linear-gradient(270deg, #000 0 22%, transparent 96%);
+  }
+  .face .sh {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: var(--pg, 21.8%);
+    bottom: var(--pg, 21.8%);
+    pointer-events: none;
+  }
+  .curl.next .face.front .sh,
+  .curl.prev .face.back .sh {
+    background: linear-gradient(90deg, rgba(58, 43, 20, var(--a1, 0)), rgba(58, 43, 20, var(--a2, 0)));
+  }
+  .curl.next .face.back .sh,
+  .curl.prev .face.front .sh {
+    background: linear-gradient(90deg, rgba(58, 43, 20, var(--a2, 0)), rgba(58, 43, 20, var(--a1, 0)));
+  }
+  .face .gl {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: var(--pg, 21.8%);
+    bottom: var(--pg, 21.8%);
+    pointer-events: none;
+    background: #fffaf0;
+    opacity: calc(var(--shade, 0) * var(--lit, 1) * var(--lit, 1) * 0.2);
+  }
+  .bk-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    z-index: 60;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bk-zone:active {
+    cursor: grabbing;
+  }
+  .bk-prev {
+    left: 0;
+    width: 50%;
+  }
+  .bk-next {
+    right: 0;
+    width: 50%;
+  }
+  .bk-captions {
+    display: grid;
+    justify-items: center;
+    min-height: 22px;
+  }
+  .bk-captions > * {
+    grid-area: 1/1;
+    margin: 0;
+  }
+  .bk-caption {
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    color: var(--body);
+    animation: bk-cap-in 0.5s ease both;
+  }
+  .bk-caption.live {
+    animation: none;
+  }
+  @keyframes bk-cap-in {
+    0% {
+      opacity: 0;
+    }
+  }
+  .bk-read {
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: var(--coral-text);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+  }
+  .bk-read:hover {
+    border-color: var(--coral-text);
+  }
+  .bk-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 7px;
+    background: var(--surface);
+  }
+  .bk-tools .tool {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background-color 0.18s ease, color 0.18s ease;
+  }
+  .bk-tools .tool:hover {
+    background: var(--card);
+    color: var(--ink);
+  }
+  .bk-tools .tool:disabled {
+    opacity: 0.32;
+    cursor: default;
+    background: transparent;
+  }
+  .bk-tools .tool svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+  }
+  .zoom-read {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+    min-width: 40px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .tool-sep {
+    width: 1px;
+    height: 17px;
+    background: var(--line);
+    margin: 0 2px;
+  }
+  .bk-tools .tool[aria-pressed='true'] {
+    background: rgba(201, 83, 42, 0.14);
+    color: var(--coral-text);
+  }
+  /* 放大镜：真躺在纸面上的一枚铜圈镜。镜片下藏一份书的副本，
+     按镜心所在的页面点放大并圆形遮罩；它挂在倾斜变换之外，
+     所以书倾斜时镜子纹丝不动。 */
+  .loupe {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--lr, 270px);
+    height: var(--lr, 270px);
+    pointer-events: none;
+    z-index: 80;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    will-change: transform;
+  }
+  .loupe.on {
+    opacity: 1;
+  }
+  .loupe.held .ring {
+    cursor: grabbing;
+  }
+  .loupe .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: auto;
+    cursor: grab;
+    padding: calc(var(--lr, 270px) * 0.058);
+    box-shadow:
+      0 1px 2px rgba(58, 44, 26, 0.3),
+      0 10px 18px rgba(58, 44, 26, 0.24),
+      0 26px 40px rgba(58, 44, 26, 0.2),
+      0 48px 66px rgba(58, 44, 26, 0.13);
+  }
+  .loupe .ring:before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    background: linear-gradient(
+      146deg,
+      #fdf7e9 0%,
+      #e6d7b4 14%,
+      #b69d70 32%,
+      #7d6740 50%,
+      #cdbb92 66%,
+      #f4ead3 80%,
+      #9b8459 100%
+    );
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.8),
+      inset 0 -2px 3px rgba(70, 52, 26, 0.5);
+    -webkit-mask-image: radial-gradient(circle closest-side at 50% 50%, transparent 0 88.2%, #000 89.8% 100%);
+    mask-image: radial-gradient(circle closest-side at 50% 50%, transparent 0 88.2%, #000 89.8% 100%);
+  }
+  .loupe .grip {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: calc(var(--lr, 270px) * 0.74);
+    height: calc(var(--lr, 270px) * 0.125);
+    transform-origin: 0 50%;
+    transform: rotate(40deg) translate(calc(var(--lr, 270px) * 0.33), -50%);
+    border-radius: calc(var(--lr, 270px) * 0.06);
+    pointer-events: auto;
+    cursor: grab;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.46) 0 13%, rgba(255, 255, 255, 0) 44%, rgba(0, 0, 0, 0.26) 100%),
+      linear-gradient(90deg, #d9bd82 0 14%, #a9884e 14% 20%, #6d4c2b 20% 62%, #5a3d22 62% 92%, #7a563180 92% 100%);
+    box-shadow:
+      0 8px 15px rgba(58, 44, 26, 0.26),
+      0 18px 26px rgba(58, 44, 26, 0.14);
+  }
+  .lens {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 0 1px rgba(52, 40, 22, 0.55),
+      inset 0 4px 12px rgba(40, 30, 14, 0.28),
+      inset 0 -7px 16px rgba(255, 250, 240, 0.14);
+  }
+  .zoomwrap {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+  }
+  .zoominner {
+    position: absolute;
+    inset: 0;
+    transform-origin: 0 0;
+  }
+  .lens:before,
+  .lens:after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  .lens:before {
+    z-index: 1;
+    background: radial-gradient(
+      circle at 50% 50%,
+      rgba(0, 0, 0, 0) 54%,
+      rgba(58, 44, 26, 0.1) 76%,
+      rgba(46, 34, 16, 0.34) 100%
+    );
+    box-shadow:
+      inset 0 0 0 2px rgba(130, 162, 196, 0.26),
+      inset 0 0 0 4px rgba(206, 158, 112, 0.15);
+  }
+  .lens:after {
+    z-index: 2;
+    background:
+      radial-gradient(36% 26% at 29% 19%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 76%),
+      radial-gradient(24% 16% at 74% 86%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 80%),
+      linear-gradient(150deg, rgba(255, 255, 255, 0.06) 0 18%, rgba(255, 255, 255, 0) 42%);
+  }
+  @media (pointer: coarse) {
+    .loupe {
+      display: none;
+    }
+  }
+  .bk-hint {
+    margin: 0;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--faint);
+    transition: opacity 0.4s ease;
+  }
+  .bk-hint.gone {
+    opacity: 0;
+  }
+  .bk-wrap.intro .bk-full img,
+  .bk-wrap.intro .bk-half-img {
+    filter: url(#bk-mblur-1);
+  }
+  .bk-wrap.intro.b2 .bk-full img,
+  .bk-wrap.intro.b2 .bk-half-img {
+    filter: url(#bk-mblur-2);
+  }
+  .bk-wrap.intro .bk-caption {
+    animation: none;
+  }
+
+  .bk-plates {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 0 40px;
+  }
+  .bk-label {
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    color: var(--faint);
+    margin: 0 0 14px;
+  }
+  .bk-plate-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--line);
+  }
+  .bk-plate {
+    display: grid;
+    grid-template-columns: 4.2em minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: baseline;
+    width: 100%;
+    padding: 13px 4px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    transition: background-color 0.22s ease, padding-left 0.22s ease;
+  }
+  .bk-plate:hover,
+  .bk-plate[aria-current='true'] {
+    background: var(--card);
+    padding-left: 12px;
+  }
+  .bk-plate .n {
+    font-size: 12px;
+    color: var(--faint);
+  }
+  .bk-plate .t {
+    font-family: var(--font-serif);
+    font-size: clamp(16px, 1.8vw, 19px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bk-plate .p {
+    font-size: 12px;
+    color: var(--faint);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .bk-plate[aria-current='true'] .p {
+    color: var(--coral-text);
+  }
+  .bk-foot {
+    margin: 18px 0 0;
+    font-size: 13px;
+  }
+  .bk-foot a {
+    color: var(--muted);
+  }
+
+  @media (max-width: 640px) {
+    .bk-kicker {
+      font-size: 10.5px;
+      letter-spacing: 0.14em;
+      padding: 0 16px;
+      text-align: center;
+    }
+    .bk-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 70;
+      padding: 12px 6px;
+    }
+    .bk-arrow.left {
+      left: 2px;
+    }
+    .bk-arrow.right {
+      right: 2px;
+    }
+    .bk-3d {
+      max-width: none;
+    }
+    .bk-hint {
+      font-size: 9.5px;
+      letter-spacing: 0.1em;
+      padding: 0 16px;
+      text-align: center;
+    }
+  }
+</style>
+
+<script define:vars={{ spreads }}>
+  /* 翻页引擎：曲面书页 = 嵌套窄条链，切线沿弧线扫过。
+     改编自 MengTo/sketchbook（跨页从 PNG 换成构建时生成的 SVG data URI，
+     去掉了放大镜与缩放工具）。 */
+  const PAGES = spreads;
+  const M = PAGES.length;
+
+  const wrap = document.getElementById('bkWrap');
+  const stage = document.getElementById('bkStage');
+  const bk3d = document.getElementById('bk3d');
+  const book = document.getElementById('bkBook');
+  const capBox = document.getElementById('bkCaptions');
+  const readLink = document.getElementById('bkRead');
+  const hint = document.getElementById('bkHint');
+  const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const N = 18;
+  const SPAN = 0.449;
+  const BETA = 0.6;
+  let idx = 0,
+    turn = null;
+  let strips = [];
+
+  function el(t, c) {
+    const e = document.createElement(t);
+    if (c) e.className = c;
+    return e;
+  }
+  function imgEl(i, side) {
+    const im = new Image();
+    im.className = 'bk-half-img ' + side;
+    im.draggable = false;
+    im.alt = '';
+    im.src = PAGES[i].url;
+    return im;
+  }
+  function halfEl(pos, i) {
+    const d = el('div', 'bk-half ' + pos);
+    d.appendChild(imgEl(i, pos));
+    d.appendChild(el('div', 'gutter-shade ' + pos));
+    return d;
+  }
+  function buildCurl(dir, from, to) {
+    strips = [];
+    const c = el('div', 'curl ' + dir);
+    c.style.setProperty('--n', N);
+    c.style.setProperty('--span', SPAN);
+    let host = c;
+    for (let i = 0; i < N; i++) {
+      const s = el('div', 'strip');
+      const gut = 'calc(var(--bw) * 0.5)';
+      const sw = 'calc(var(--bw) * ' + SPAN + ' / ' + N + ')';
+      const A = 'calc(-1 * (' + gut + ' + ' + i + ' * ' + sw + '))';
+      const B = 'calc(' + (i + 1) + ' * ' + sw + ' - ' + gut + ')';
+      const f = el('div', 'face front'),
+        b = el('div', 'face back');
+      const dress = (e, url, px) => {
+        e.style.backgroundImage = 'url("' + url + '")';
+        e.style.backgroundPositionX = px;
+      };
+      dress(f, PAGES[from].url, dir === 'next' ? A : B);
+      dress(b, PAGES[to].url, dir === 'next' ? B : A);
+      f.appendChild(el('div', 'sh'));
+      f.appendChild(el('div', 'gl'));
+      b.appendChild(el('div', 'sh'));
+      b.appendChild(el('div', 'gl'));
+      s.appendChild(f);
+      s.appendChild(b);
+      if (i === N - 1) s.classList.add('edge');
+      host.appendChild(s);
+      host = s;
+      strips.push(s);
+    }
+    return c;
+  }
+  function applyTurn(t) {
+    const th = Math.PI * t;
+    const beta = BETA * Math.sin(Math.PI * t);
+    const D = 180 / Math.PI;
+    const tt = th + beta,
+      td = (2 * beta) / N;
+    bk3d.style.setProperty('--tt', (tt * D).toFixed(2) + 'deg');
+    bk3d.style.setProperty('--td', (td * D).toFixed(3) + 'deg');
+    bk3d.style.setProperty('--shade', Math.sin(Math.PI * t).toFixed(3));
+    fadeCaption(t);
+    for (let i = 0; i < strips.length; i++) {
+      const l1 = Math.abs(Math.cos(tt - i * td));
+      const l2 = Math.abs(Math.cos(tt - (i + 1) * td));
+      const st = strips[i].style;
+      st.setProperty('--lit', l1.toFixed(3));
+      st.setProperty('--a1', ((1 - l1) * 0.62).toFixed(3));
+      st.setProperty('--a2', ((1 - l2) * 0.62).toFixed(3));
+    }
+  }
+  function paint() {
+    book.textContent = '';
+    if (!turn) {
+      const f = el('div', 'bk-full');
+      const im = new Image();
+      im.src = PAGES[idx].url;
+      im.alt = PAGES[idx].title;
+      im.draggable = false;
+      f.appendChild(im);
+      book.appendChild(f);
+      bk3d.style.setProperty('--shade', '0');
+    } else {
+      const next = turn.dir === 'next';
+      book.appendChild(halfEl('left', next ? turn.from : turn.to));
+      book.appendChild(halfEl('right', next ? turn.to : turn.from));
+      book.appendChild(buildCurl(turn.dir, turn.from, turn.to));
+      applyTurn(turn.t);
+    }
+    const a = el('button', 'bk-zone bk-prev'),
+      b = el('button', 'bk-zone bk-next');
+    a.setAttribute('aria-label', '上一期');
+    b.setAttribute('aria-label', '下一期');
+    book.appendChild(a);
+    book.appendChild(b);
+    layout();
+    caption();
+    marks();
+    syncZoomLayer();
+    placeLoupe();
+  }
+  let capOut = null,
+    capIn = null;
+  function caption() {
+    capBox.textContent = '';
+    capOut = capIn = null;
+    if (turn) {
+      capOut = el('p', 'bk-caption live');
+      capOut.textContent = PAGES[turn.from].title;
+      capBox.appendChild(capOut);
+      capIn = el('p', 'bk-caption live');
+      capIn.textContent = PAGES[turn.to].title;
+      capBox.appendChild(capIn);
+      fadeCaption(turn.t);
+    } else {
+      const p = el('p', 'bk-caption');
+      p.textContent = PAGES[idx].title;
+      capBox.appendChild(p);
+    }
+    const cur = turn ? turn.to : idx;
+    readLink.href = '/daily/' + PAGES[cur].date + '/';
+  }
+  function fadeCaption(t) {
+    if (!capOut || !capIn) return;
+    const out = 1 - Math.max(0, Math.min(1, (t - 0.1) / 0.28));
+    const inn = Math.max(0, Math.min(1, (t - 0.56) / 0.3));
+    capOut.style.opacity = out.toFixed(3);
+    capIn.style.opacity = inn.toFixed(3);
+  }
+  function layout() {
+    bk3d.style.setProperty('--bw', book.clientWidth + 'px');
+  }
+  addEventListener('resize', layout);
+
+  /* ---------------- 弹簧动画循环 ---------------- */
+  let spring = null;
+  function animateTo(target, onDone, stiff, damp) {
+    spring = { kind: 'spring', v: 0, target, done: onDone, k: stiff || 150, c: damp || 22 };
+    kick();
+  }
+  function tweenTo(target, dur, onDone) {
+    spring = { kind: 'tween', from: turn ? turn.t : 0, target, dur, e: 0, done: onDone };
+    kick();
+  }
+  let raf = null,
+    last = 0;
+  function tick(now) {
+    raf = null;
+    const dt = Math.min(0.032, (now - last) / 1000 || 0.016);
+    last = now;
+    if (spring && turn) {
+      const s = spring;
+      if (s.kind === 'tween') {
+        s.e += dt;
+        const k = Math.min(1, s.e / s.dur);
+        turn.t = s.from + (s.target - s.from) * k;
+        applyTurn(turn.t);
+        if (k >= 1) {
+          spring = null;
+          const d = s.done;
+          d && d();
+        }
+      } else {
+        const x = turn.t - s.target;
+        s.v += (-s.k * x - s.c * s.v) * dt;
+        turn.t += s.v * dt;
+        if (Math.abs(turn.t - s.target) < 0.002 && Math.abs(s.v) < 0.02) {
+          turn.t = s.target;
+          spring = null;
+          applyTurn(turn.t);
+          const d = s.done;
+          d && d();
+        } else applyTurn(turn.t);
+      }
+    }
+    viewSpring();
+    const lmoved = loupeEase();
+    if ((spring || viewActive || lmoved) && raf === null) raf = requestAnimationFrame(tick);
+  }
+  function kick() {
+    if (raf === null) {
+      last = performance.now();
+      raf = requestAnimationFrame(tick);
+    }
+  }
+
+  /* ---------------- 指针视差（书朝光标微倾） ---------------- */
+  const TILT_X = 4.5,
+    TILT_Y = 7;
+  const ZOOM_MIN = 0.9,
+    ZOOM_MAX = 1.6;
+  const view = { rx: 0, ry: 0, z: 1, trx: 0, try_: 0, tz: 1 };
+  let viewActive = false;
+  let lastZ = 1;
+  function applyView() {
+    bk3d.style.setProperty('--rx', view.rx.toFixed(2) + 'deg');
+    bk3d.style.setProperty('--ry', view.ry.toFixed(2) + 'deg');
+    bk3d.style.setProperty('--zoom', view.z.toFixed(3));
+    /* 镜子不动，但它底下的纸已经缩放过了 */
+    if (view.z !== lastZ) {
+      lastZ = view.z;
+      placeLoupe();
+    }
+  }
+  function viewSpring() {
+    const e = 0.14;
+    let moved = false;
+    for (const [k, t] of [
+      ['rx', 'trx'],
+      ['ry', 'try_'],
+      ['z', 'tz'],
+    ]) {
+      const d = view[t] - view[k];
+      if (Math.abs(d) > 0.0006) {
+        view[k] += d * e;
+        moved = true;
+      } else view[k] = view[t];
+    }
+    if (moved) applyView();
+    viewActive = moved;
+    return moved;
+  }
+  function setView(rx, ry, z) {
+    view.trx = Math.max(-TILT_X, Math.min(TILT_X, rx));
+    view.try_ = Math.max(-TILT_Y, Math.min(TILT_Y, ry));
+    view.tz = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z === undefined ? view.tz : z));
+    viewActive = true;
+    kick();
+    syncZoom();
+  }
+  const zRead = document.getElementById('zRead');
+  const zInBtn = document.getElementById('zIn'),
+    zOutBtn = document.getElementById('zOut');
+  function syncZoom() {
+    zRead.textContent = Math.round(view.tz * 100) + '%';
+    zOutBtn.disabled = view.tz <= ZOOM_MIN + 0.001;
+    zInBtn.disabled = view.tz >= ZOOM_MAX - 0.001;
+  }
+  zInBtn.onclick = () => {
+    setView(view.trx, view.try_, view.tz * 1.16);
+    hideHint();
+  };
+  zOutBtn.onclick = () => {
+    setView(view.trx, view.try_, view.tz / 1.16);
+    hideHint();
+  };
+  stage.addEventListener('dblclick', () => setView(view.trx, view.try_, 1));
+  addEventListener(
+    'pointermove',
+    (e) => {
+      if (e.pointerType === 'touch' || drag) return;
+      const r = book.getBoundingClientRect();
+      if (!r.width) return;
+      const nx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width * 0.62)));
+      const ny = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (r.height * 0.9)));
+      setView(-ny * TILT_X, nx * TILT_Y);
+    },
+    { passive: true }
+  );
+  addEventListener('pointerout', (e) => {
+    if (!e.relatedTarget) setView(0, 0);
+  });
+  addEventListener('blur', () => setView(0, 0));
+
+  /* ---------------- 拖拽翻页 ---------------- */
+  let drag = null;
+  function hideHint() {
+    hint.classList.add('gone');
+  }
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const onBook = e.target.closest('.bk-zone');
+    stage.setPointerCapture(e.pointerId);
+    hideHint();
+    if (!onBook || introOn) return;
+    const r = book.getBoundingClientRect();
+    const dir = (e.clientX - r.left) / r.width > 0.5 ? 'next' : 'prev';
+    startTurn(dir, 0);
+    drag = { dir, x0: e.clientX, w: r.width, moved: 0, vel: 0, tPrev: performance.now() };
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x0;
+    drag.moved = Math.max(drag.moved, Math.abs(dx));
+    const raw = (drag.dir === 'next' ? -dx : dx) / (drag.w * 0.62);
+    const t = Math.max(0, Math.min(1, raw));
+    const now = performance.now();
+    drag.vel = (t - (turn ? turn.t : 0)) / Math.max(0.001, (now - drag.tPrev) / 1000);
+    drag.tPrev = now;
+    if (turn) {
+      turn.t = t;
+      applyTurn(t);
+    }
+  });
+  function endDrag() {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if (!turn) return;
+    if (d.moved < 6) {
+      commit();
+      return;
+    }
+    const go = turn.t > 0.42 || d.vel > 1.1;
+    if (go) commit();
+    else cancel();
+  }
+  stage.addEventListener('dragstart', (e) => e.preventDefault());
+  stage.addEventListener('selectstart', (e) => e.preventDefault());
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointercancel', endDrag);
+
+  /* ---------------- 翻页控制 ---------------- */
+  function startTurn(dir, t) {
+    spring = null;
+    if (turn) {
+      idx = turn.to;
+      turn = null;
+    }
+    shoveLoupe(dir);
+    const from = idx;
+    turn = { dir, from, to: dir === 'next' ? (from + 1) % M : (from - 1 + M) % M, t: t || 0 };
+    paint();
+  }
+  function commit() {
+    if (!turn) return;
+    if (REDUCED) {
+      idx = turn.to;
+      turn = null;
+      paint();
+      return;
+    }
+    animateTo(
+      1,
+      () => {
+        idx = turn.to;
+        turn = null;
+        paint();
+      },
+      170,
+      26
+    );
+    kick();
+  }
+  function cancel() {
+    if (!turn) return;
+    animateTo(
+      0,
+      () => {
+        turn = null;
+        paint();
+      },
+      150,
+      24
+    );
+    kick();
+  }
+  function step(dir) {
+    if (introOn) endIntro();
+    if (turn) {
+      idx = turn.to;
+      turn = null;
+    }
+    startTurn(dir, 0);
+    commit();
+  }
+  function goTo(i) {
+    if (introOn) endIntro();
+    if (i === idx) return;
+    if (turn) {
+      idx = turn.to;
+      turn = null;
+    }
+    const fwd = (i - idx + M) % M,
+      back = (idx - i + M) % M;
+    if (Math.min(fwd, back) === 1) {
+      step(fwd === 1 ? 'next' : 'prev');
+      return;
+    }
+    idx = i;
+    paint();
+  }
+  document.getElementById('bkLeft').onclick = () => step('prev');
+  document.getElementById('bkRight').onclick = () => step('next');
+  addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+    hideHint();
+    step(e.key === 'ArrowRight' ? 'next' : 'prev');
+  });
+
+  /* ---------------- 放大镜 ----------------
+     镜片下是书的第二份副本，按镜心所在的页面点放大 MAG 倍并圆形遮罩；
+     副本挂在倾斜变换之外，书倾斜不带动镜子；翻页扫过时镜子自动让位。 */
+  const loupe = document.getElementById('loupe');
+  const loupeBtn = document.getElementById('loupeBtn');
+  const zoomWrap = document.getElementById('zoomWrap');
+  const zoomInner = document.getElementById('zoomInner');
+  const MAG = 2.3;
+  let loupeOn = true,
+    lx = null,
+    ly = null,
+    lgrab = null,
+    lTarget = null;
+
+  function loupeSize() {
+    return Math.round(Math.max(165, Math.min(262, book.clientWidth * 0.235)));
+  }
+  function bookBox() {
+    return { x: 0, y: 0, w: book.clientWidth, h: book.clientHeight };
+  }
+  /* 停在书右下角，半个身位搭在纸外 */
+  function restLoupe() {
+    const b = bookBox();
+    lx = b.x + b.w * 0.88;
+    ly = b.y + b.h * 0.855;
+    placeLoupe();
+  }
+  /* 把书当前显示的内容镜像进放大副本 */
+  function syncZoomLayer() {
+    zoomInner.textContent = '';
+    for (const c of book.children) {
+      if (c.classList.contains('bk-zone')) continue;
+      zoomInner.appendChild(c.cloneNode(true));
+    }
+  }
+  function placeLoupe() {
+    if (lx === null) return;
+    const B = bookBox(),
+      bw = B.w,
+      bh = B.h;
+    if (!bw) return;
+    const R = loupeSize() / 2,
+      bez = R * 2 * 0.058;
+    loupe.style.setProperty('--lr', R * 2 + 'px');
+    loupe.style.transform = 'translate3d(' + (lx - R).toFixed(1) + 'px,' + (ly - R).toFixed(1) + 'px,0)';
+    if (loupeOn) loupe.classList.add('on');
+
+    /* 书缩放后纸面边缘的落点（纸面横 5.1%–94.9%、纵 21.8%–78.2%） */
+    const z = view.z,
+      cx = bw / 2,
+      cy = bh / 2;
+    const x0 = cx + (bw * 0.051 - cx) * z,
+      x1 = cx + (bw * 0.949 - cx) * z;
+    const y0 = cy + (bh * 0.218 - cy) * z,
+      y1 = cy + (bh * 0.782 - cy) * z;
+    /* 镜心离开纸面时副本淡出，只剩一块透明玻璃 */
+    const nx = Math.max(x0, Math.min(lx, x1));
+    const ny = Math.max(y0, Math.min(ly, y1));
+    const inside =
+      lx > x0 && lx < x1 && ly > y0 && ly < y1
+        ? Math.min(lx - x0, x1 - lx, ly - y0, y1 - ly)
+        : -Math.hypot(lx - nx, ly - ny);
+    const k = Math.max(0, Math.min(1, (inside + R * 0.3) / (R * 0.55)));
+
+    zoomWrap.style.opacity = (loupeOn ? k : 0).toFixed(3);
+    if (k <= 0.002) return;
+    const r = (R - bez).toFixed(1);
+    const mask =
+      'radial-gradient(circle ' + r + 'px at ' + lx.toFixed(1) + 'px ' + ly.toFixed(1) + 'px,' +
+      '#000 calc(100% - 1px),transparent 100%)';
+    zoomWrap.style.webkitMaskImage = mask;
+    zoomWrap.style.maskImage = mask;
+    /* 以镜心下方的页面点为原点放大，镜里始终是屏幕内容的 MAG 倍 */
+    const px = cx + (lx - cx) / z,
+      py = cy + (ly - cy) / z,
+      s = MAG * z;
+    zoomInner.style.transform =
+      'translate(' + (lx - px * s).toFixed(1) + 'px,' + (ly - py * s).toFixed(1) + 'px) scale(' + s.toFixed(4) + ')';
+  }
+  /* 书页扫过时把镜子推到一边 */
+  function shoveLoupe(dir) {
+    if (!loupeOn || lx === null || lgrab) return;
+    const b = bookBox();
+    const nx = (b.w / 2 + (lx - b.x - b.w / 2) / view.z) / b.w,
+      ny = (b.h / 2 + (ly - b.y - b.h / 2) / view.z) / b.h;
+    if (nx < 0.02 || nx > 0.98 || ny < 0.17 || ny > 0.83) return;
+    lTarget = { x: b.x + b.w * (dir === 'next' ? 0.12 : 0.88), y: b.y + b.h * 0.855 };
+    kick();
+  }
+  function loupeEase() {
+    if (!lTarget) return false;
+    if (lgrab) {
+      lTarget = null;
+      return false;
+    }
+    const dx = lTarget.x - lx,
+      dy = lTarget.y - ly;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+      lx = lTarget.x;
+      ly = lTarget.y;
+      lTarget = null;
+      placeLoupe();
+      return false;
+    }
+    lx += dx * 0.17;
+    ly += dy * 0.17;
+    placeLoupe();
+    return true;
+  }
+  loupe.addEventListener('pointerdown', (e) => {
+    if (!loupeOn || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    lTarget = null;
+    lgrab = { cx: e.clientX, cy: e.clientY, lx0: lx, ly0: ly };
+    loupe.classList.add('held');
+    loupe.setPointerCapture(e.pointerId);
+    hideHint();
+  });
+  loupe.addEventListener('pointermove', (e) => {
+    if (!lgrab) return;
+    const b = bookBox(),
+      R = loupeSize() / 2;
+    lx = Math.max(b.x - R * 0.7, Math.min(b.x + b.w + R * 0.7, lgrab.lx0 + (e.clientX - lgrab.cx)));
+    ly = Math.max(b.y - R * 0.7, Math.min(b.y + b.h + R * 1.0, lgrab.ly0 + (e.clientY - lgrab.cy)));
+    placeLoupe();
+  });
+  function dropLoupe() {
+    lgrab = null;
+    loupe.classList.remove('held');
+  }
+  loupe.addEventListener('pointerup', dropLoupe);
+  loupe.addEventListener('pointercancel', dropLoupe);
+  loupeBtn.onclick = () => {
+    loupeOn = !loupeOn;
+    loupeBtn.setAttribute('aria-pressed', String(loupeOn));
+    loupe.classList.toggle('on', loupeOn);
+    if (loupeOn && lx === null) restLoupe();
+    placeLoupe();
+  };
+  addEventListener('resize', () => {
+    lx = null;
+    restLoupe();
+  });
+
+  /* ---------------- 册内索引 ---------------- */
+  const plateList = document.getElementById('bkPlateList');
+  if (plateList) PAGES.forEach((p, i) => {
+    const li = el('li');
+    const b = el('button', 'bk-plate');
+    b.innerHTML =
+      '<span class="n"></span><span class="t"></span><span class="p"></span>';
+    b.querySelector('.n').textContent = '第 ' + p.issueNo + ' 期';
+    b.querySelector('.t').textContent = p.lead;
+    b.querySelector('.p').textContent = p.date + ' · ' + p.count + ' 条';
+    b.onclick = () => {
+      goTo(i);
+      document.getElementById('bkHero').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    li.appendChild(b);
+    plateList.appendChild(li);
+  });
+  function marks() {
+    if (!plateList) return;
+    const cur = turn ? turn.to : idx;
+    plateList
+      .querySelectorAll('.bk-plate')
+      .forEach((b, i) => b.setAttribute('aria-current', i === cur ? 'true' : 'false'));
+  }
+
+  /* ---------------- 开场快翻 ---------------- */
+  let riffle = null,
+    riffleAt = 0,
+    introOn = false;
+  function endIntro() {
+    introOn = false;
+    wrap.classList.remove('intro', 'b2');
+  }
+  function riffleStep() {
+    const s = riffle[riffleAt];
+    wrap.classList.toggle('b2', s.bell > 0.55);
+    startTurn('next', 0);
+    tweenTo(1, s.dur, () => {
+      idx = turn.to;
+      turn = null;
+      riffleAt++;
+      if (introOn && riffleAt < riffle.length) {
+        paint();
+        riffleStep();
+      } else {
+        endIntro();
+        paint();
+      }
+    });
+  }
+  function startIntro() {
+    const coarse = matchMedia('(max-width: 640px), (pointer: coarse)').matches;
+    if (coarse || REDUCED) {
+      paint();
+      return;
+    }
+    const steps = M; // 整整翻一圈，落回最新一期
+    riffle = [];
+    for (let r = 0; r < steps; r++) {
+      const bell = Math.sin(Math.PI * (r / (steps - 1)));
+      riffle.push({ bell, dur: 0.26 - 0.19 * bell });
+    }
+    riffleAt = 0;
+    introOn = true;
+    wrap.classList.add('intro');
+    riffleStep();
+  }
+
+  /* ---------------- 启动 ---------------- */
+  (async function boot() {
+    paint();
+    applyView();
+    syncZoom();
+    await Promise.all(
+      PAGES.map((p) => {
+        const im = new Image();
+        im.src = p.url;
+        return im.decode ? im.decode().catch(() => {}) : new Promise((r) => (im.onload = im.onerror = r));
+      })
+    );
+    restLoupe();
+    setTimeout(startIntro, 220);
+  })();
+</script>

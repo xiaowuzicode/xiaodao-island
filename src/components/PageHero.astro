@@ -1,0 +1,23 @@
+---
+/** 内页的页头：左边标题与说明，右边一小块小岛画面，让每个内页都看得出"这是岛上的某个地方"。 */
+interface Props {
+  /** 页头小字：这一页对应岛上的哪个地点。 */
+  place: string;
+  title: string;
+  desc?: string;
+}
+const { place, title, desc } = Astro.props;
+---
+
+<section class="page-hero">
+  <div class="page-hero-text">
+    <p class="eyebrow">{place}</p>
+    <h1>{title}</h1>
+    {desc && <p class="page-hero-desc">{desc}</p>}
+    <slot />
+  </div>
+  <a class="page-hero-art" href="/" aria-label="回到 3D 小岛">
+    <img src="/island/poster-wide.webp" alt="" width="1600" height="1000" loading="lazy" decoding="async" />
+    <span>回到小岛 →</span>
+  </a>
+</section>

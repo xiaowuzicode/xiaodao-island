@@ -1,0 +1,22 @@
+{
+  "name": "xiaodao-ai-site",
+  "type": "module",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check:island": "bun src/island/layout.check.ts",
+    "check:topics": "bun src/lib/topics.check.ts"
+  },
+  "dependencies": {
+    "@astrojs/rss": "^4.0.10",
+    "@astrojs/sitemap": "^3.2.1",
+    "astro": "^5.1.0",
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.180.0"
+  }
+}

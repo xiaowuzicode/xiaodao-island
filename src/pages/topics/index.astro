@@ -1,0 +1,31 @@
+---
+/** 专题总览：每个专题一张卡片，写着收了多少篇、最新的三篇。 */
+import { getCollection } from 'astro:content';
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+import { TOPICS, topicsOf } from '@/lib/topics';
+import { breadcrumbLd } from '@/lib/seo';
+
+const posts = (await getCollection('posts')).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const groups = TOPICS.map((t) => ({ t, list: posts.filter((p) => topicsOf(p.data.title, p.data.summary).includes(t.slug)) }))
+  .filter((g) => g.list.length > 0)
+  .sort((a, b) => b.list.length - a.list.length);
+---
+
+<Base title="专题 · 小岛AI" description={`小岛AI 的 ${groups.length} 个专题：Claude Code、AI 编程、Agent 工程、模型、AI 安全……按话题读完一个方向。`} jsonLd={breadcrumbLd([['小岛', '/'], ['专题', '/topics/']])}>
+  <PageHero place="岛刊社 · TOPICS" title="专题" desc="按话题把文章收拢起来：想系统看一个方向，从这里进。">
+    <div class="chips"><a href="/archive/">按月份看全部文章</a><a href="/daily/">日报</a></div>
+  </PageHero>
+  <ul class="topic-grid">
+    {groups.map(({ t, list }) => (
+      <li>
+        <a class="topic-card" href={`/topics/${t.slug}/`}>
+          <span class="topic-count">{list.length} 篇</span>
+          <h2>{t.name}</h2>
+          <p>{t.desc}</p>
+          <ul>{list.slice(0, 3).map((p) => <li>{p.data.title}</li>)}</ul>
+        </a>
+      </li>
+    ))}
+  </ul>
+</Base>
