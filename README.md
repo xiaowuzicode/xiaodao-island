@@ -26,6 +26,7 @@ bun run build      # 产物在 dist/
 | 日报（一天一个 JSON） | `src/data/daily/` |
 | B 站视频列表 | `src/data/videos.json`，封面在 `public/videos/` |
 | 站点地址、关于页、图标 | `astro.config.mjs` 的 `site`、`src/pages/about.astro`、`public/` 下的图标 |
+| 给 AI 爬虫看的站点说明 | `public/llms.txt` |
 
 ## 目录
 
