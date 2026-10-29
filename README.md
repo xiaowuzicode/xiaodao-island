@@ -2,10 +2,23 @@
 
 [xiaodao.ai](https://xiaodao.ai) 的网站代码：一个 Astro 静态站，首页是一座可以逛的 3D 小岛（three.js），文章、日报和视频都住在岛上。
 
+[![白天的小岛全景：海岸、建筑与灯塔](docs/images/island-day.jpg)](https://xiaodao.ai)
+
+[上岛逛逛 →](https://xiaodao.ai)
+
 这个仓库**只放代码**，文章和日报换成了几篇示例。真正的网站内容在另一个私有仓库里，网站代码有更新时会同步过来。
 
-- 怎么做出来的，B 站有两支视频拆过：《我的 3D 小岛是怎么做出来的？》（海水、鱼群、灯塔一层层拆开）和《搞懂 Git Worktree，再 Vibe Coding》。
+- 怎么做出来的，B 站有两支视频拆过：[《我的 3D 小岛是怎么做出来的？》](https://www.bilibili.com/video/BV1SDHG6GEih/)（海水、鱼群、灯塔一层层拆开）和[《搞懂 Git Worktree，再 Vibe Coding》](https://www.bilibili.com/video/BV15kxN6gEge/)。
 - 很多代码是我和 AI（Claude、Codex）一起写的。
+
+## 岛上有什么
+
+下面都是网站实际运行的画面。
+
+| 浅海里的生命 | 黄昏与灯塔 |
+|---|---|
+| ![浅海近景：鳐鱼游过水草、礁石和沙纹](docs/images/ocean-life.jpg) | ![黄昏小岛：灯塔照向海面，岸边灯光亮起](docs/images/island-dusk.jpg) |
+| 海水颜色、折射、沙纹、水草和游动的鱼，都由代码绘制。海水入口：[ocean-glsl.ts](src/island/ocean-glsl.ts)。 | 岛上有昼夜变化、灯塔和海浪声。相关实现都在 [src/island/](src/island/)。 |
 
 ## 跑起来
 
