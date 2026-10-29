@@ -46,6 +46,7 @@ bun run build      # 产物在 dist/
 | 路径 | 是什么 |
 |---|---|
 | `src/island/` | 3D 小岛：地形、海水着色器（`ocean-glsl.ts`）、鱼群、灯塔、昼夜、镜头 |
+| `src/island/fishing.ts`、`fishing-gear.ts` | 码头钓鱼小游戏：甩竿、鱼影、咬钩、收进鱼桶；贝壳升级鱼线 / 鱼饵 / 手感（进度存在浏览器里） |
 | `src/pages/` | 页面：首页、文章、日报、专题、视频、归档 |
 | `src/lib/topics.ts` | 专题：按标题和摘要里的关键词自动归类 |
 

@@ -129,5 +129,5 @@ export function createSelection(d: Deps) {
     d.wake();
   }
 
-  return { select, deselect, tap };
+  return { select, deselect, tap, pick };
 }

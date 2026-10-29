@@ -105,6 +105,11 @@ function placeSitter(mats: Materials, fig: Figure, role: Extract<Role, { kind: '
   pole.position.y = 1.2;
   rod.add(pole);
   rod.rotation.x = 0.9;
+  // 竿梢：钓鱼时线从这里垂下去（竿长 2.6，中心在 1.2）
+  const tip = new THREE.Object3D();
+  tip.position.y = 2.5;
+  rod.add(tip);
+  rod.userData.tip = tip;
   fig.root.add(rod);
   return rod;
 }
@@ -241,9 +246,12 @@ export function createResidents(mats: Materials, count = ROLES.length) {
     const breed = w.role.dog ?? (i === 0 ? 'mutt' : null);
     return breed ? [createDog(mats, group, w, breed)] : [];
   });
+  const angler = rod as THREE.Object3D | null;
   return {
     group,
     actors,
+    /** 码头钓鱼的周伯：他的竿、竿梢和人（钓鱼小游戏借他的竿）。 */
+    angler: angler ? { rod: angler, tip: angler.userData.tip as THREE.Object3D, root: angler.parent as THREE.Object3D } : null,
     update(t: number, dt: number, hour: number) {
       // 不在作息时间里的人藏起来（照样往前走，回来时不会都挤在起点）
       for (const [h, root] of shifts) root.visible = onShift(h, hour);

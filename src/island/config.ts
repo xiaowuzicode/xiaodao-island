@@ -145,4 +145,8 @@ export const VIEWS: Record<'all' | 'harbor' | 'cape' | 'sea', View & { name: str
 };
 /** 竖屏（手机）的全岛视角：更近、更俯视，让主岛占满画面。 */
 export const VIEW_ALL_PORTRAIT: View = { look: [5, 3, 5], dist: 128, az: 0.62, tilt: 0.86 };
+/** 钓鱼视角：站在周伯身后、越过码头尽头看海。 */
+export const FISH_VIEW: View = { look: [-0.6, 0.5, 46], dist: 25, az: Math.PI + 0.35, tilt: 0.4 };
+/** 竖屏的钓鱼视角：退远一点、更正对着海，周伯和浮标都在画面里。 */
+export const FISH_VIEW_PORTRAIT: View = { look: [-0.6, 0.5, 44], dist: 34, az: Math.PI + 0.12, tilt: 0.4 };
 export const INTRO_FROM: View = { look: [0, 3, 0], dist: 230, az: -0.35, tilt: 1.15 };

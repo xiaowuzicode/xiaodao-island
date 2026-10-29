@@ -21,8 +21,8 @@ const trim = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…'
 /** 卡片里最多展示几篇最新文章、几条日报标题。 */
 const LATEST_POSTS = 6;
 const DAILY_HEADLINES = 4;
-/** 给码头钓鱼的岛民随机「钓」出的旧文章数量（从 30 天前往回均匀取）。 */
-const ARCHIVE_SAMPLE = 40;
+/** 码头钓鱼（周伯的气泡、访客自己钓）能钓出的旧文章数量（从 30 天前往回均匀取）。 */
+const ARCHIVE_SAMPLE = 120;
 const ARCHIVE_AFTER_DAYS = 30;
 
 const data: IslandData = {
@@ -146,6 +146,13 @@ const canonical = new URL('/', Astro.site);
       <button type="button" data-view="harbor" aria-pressed="false">港湾</button>
       <button type="button" data-view="cape" aria-pressed="false">灯塔岬</button>
       <button type="button" data-view="sea" aria-pressed="false">群岛航线</button>
+      <button type="button" id="isl-fish" class="isl-fish-btn" aria-pressed="false" title="小游戏：接过周伯的鱼竿，钓一篇旧文章"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="15" cy="4" r="1.6" /><path d="M15 5.6v7.4a4.5 4.5 0 0 1-9 0v-2.5l-2.4 2.4" /></svg>钓鱼<em>小游戏</em></button>
+    </div>
+    <p id="isl-fish-hud" class="isl-fish-hud" aria-live="polite" hidden></p>
+    <button type="button" id="isl-gear" class="isl-chip isl-gear" aria-expanded="false" aria-controls="isl-gear-panel" hidden>渔具 · <span id="isl-gear-shells">0</span> 贝壳</button>
+    <div id="isl-gear-panel" class="isl-gear-panel" hidden>
+      <p class="isl-gear-head">用钓鱼攒的贝壳，升级周伯的鱼竿。大鱼在外圈，鱼线够长才钓得到。</p>
+      <ul id="isl-gear-list" class="isl-gear-list"></ul>
     </div>
 
     <nav class="isl-dock" aria-label="航海图：岛上的地点">
@@ -361,6 +368,28 @@ const canonical = new URL('/', Astro.site);
       .isl-views button { border: 0; background: transparent; color: var(--isl-ink); font: 500 13px/1 var(--isl-sans); padding: 9px 12px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
       .isl-views button:hover { background: var(--isl-chip); }
       .isl-views button[aria-pressed='true'] { background: var(--isl-pick); color: var(--isl-pick-ink); }
+      /* 钓鱼是个小游戏，不是又一个视角：珊瑚红、鱼钩图标、「小游戏」角标，进页面后角标轻闪三下 */
+      .isl-views .isl-fish-btn { display: flex; align-items: center; gap: 5px; margin-left: 4px; color: var(--isl-accent); background: rgba(214, 90, 74, 0.1); font-weight: 600; }
+      .isl-views .isl-fish-btn:hover { background: rgba(214, 90, 74, 0.18); }
+      .isl-fish-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .isl-fish-btn em { font: 600 10px/1 var(--isl-sans); font-style: normal; padding: 3px 5px; border-radius: 6px; background: var(--isl-accent); color: var(--isl-pick-ink); animation: isl-fish-hey 1.6s ease 2s 3; }
+      .isl-views .isl-fish-btn[aria-pressed='true'] { background: var(--isl-accent); color: var(--isl-pick-ink); }
+      .isl-views .isl-fish-btn[aria-pressed='true'] em { background: var(--isl-pick-ink); color: var(--isl-accent); animation: none; }
+      @keyframes isl-fish-hey { 0%, 100% { transform: none; } 30% { transform: translateY(-3px) scale(1.08); } 55% { transform: none; } }
+      @media (prefers-reduced-motion: reduce) { .isl-fish-btn em { animation: none; } }
+      .isl-fish-hud { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); margin: 0; padding: 10px 16px; max-width: calc(100vw - 2 * var(--isl-gutter)); font: 500 14px/1.4 var(--isl-sans); color: var(--isl-ink); background: var(--isl-panel); border: 1px solid var(--isl-line); border-radius: 14px; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); text-align: center; pointer-events: none; }
+      .isl-fish-hud[hidden] { display: none; }
+      [data-fishing='on'] .isl-labels { display: none; }
+      .isl-gear { position: fixed; left: var(--isl-left); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+      .isl-gear[hidden], .isl-gear-panel[hidden] { display: none; }
+      .isl-gear-panel { position: fixed; left: var(--isl-left); bottom: calc(136px + env(safe-area-inset-bottom, 0px)); width: min(340px, calc(100vw - 2 * var(--isl-gutter))); padding: 14px; background: var(--isl-solid); color: var(--isl-ink); border: 1px solid var(--isl-line); border-radius: 16px; box-shadow: var(--isl-shadow); font: 13px/1.45 var(--isl-sans); }
+      .isl-gear-head { margin: 0 0 10px; color: var(--isl-muted); }
+      .isl-gear-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+      .isl-gear-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; background: var(--isl-chip); border-radius: 11px; }
+      .isl-gear-list strong { display: block; font-weight: 600; }
+      .isl-gear-list span { color: var(--isl-muted); font-variant-numeric: tabular-nums; }
+      .isl-gear-list button { flex: none; border: 0; border-radius: 9px; padding: 8px 10px; font: 600 12px/1 var(--isl-sans); background: var(--isl-pick); color: var(--isl-pick-ink); cursor: pointer; }
+      .isl-gear-list button:disabled { background: var(--isl-line); color: var(--isl-muted); cursor: default; }
 
       .isl-dock {
         position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
@@ -430,6 +459,12 @@ const canonical = new URL('/', Astro.site);
         .isl-brand { padding: 6px 12px 6px 8px; }
         .isl-chip { padding: 9px 12px; }
         .isl-views { top: auto; right: auto; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+        /* 手机上钓到后的卡片从底部升起，提示条放到顶部，免得「要甩到水里」之类的反馈藏在卡片后面 */
+        .isl-fish-hud { top: calc(72px + env(safe-area-inset-top, 0px)); bottom: auto; }
+        .isl-fish-btn em { display: none; }
+        .isl-gear { left: auto; right: var(--isl-right); bottom: calc(128px + env(safe-area-inset-bottom, 0px)); }
+        .isl-gear-panel { left: auto; right: var(--isl-right); bottom: calc(180px + env(safe-area-inset-bottom, 0px)); }
+        [data-fishing='on'] .isl-card { max-height: 40%; }
         .isl-dock { left: var(--isl-left); right: var(--isl-right); transform: none; }
         .isl-card { top: auto; left: var(--isl-left); right: var(--isl-right); width: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); max-height: 56%; border-radius: 20px; }
         [data-island='ready'] .isl-hint { display: none; }

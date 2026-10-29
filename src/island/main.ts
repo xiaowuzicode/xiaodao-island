@@ -4,8 +4,9 @@ import { createBoats, type Boats } from '@/island/boats';
 import { CameraRig } from '@/island/camera';
 import { createScreenVideo } from '@/island/cinema-screen';
 import { createClock } from '@/island/clock';
-import { LAMP_LIGHTS, MOBILE_MAX_WIDTH, RENDER, VIEWS, VIEW_ALL_PORTRAIT, type View } from '@/island/config';
+import { FISH_VIEW, FISH_VIEW_PORTRAIT, LAMP_LIGHTS, MOBILE_MAX_WIDTH, RENDER, VIEWS, VIEW_ALL_PORTRAIT, type View } from '@/island/config';
 import { PLACES, placeById, type IslandData } from '@/island/content';
+import { createFishing } from '@/island/fishing';
 import { Materials } from '@/island/geo';
 import { Labels, type LabelSpec } from '@/island/labels';
 import { openPlayer } from '@/island/player';
@@ -120,6 +121,7 @@ export function start() {
       s.splashes.update(t);
       s.shops.update(t);
       s.lh.update(t, dt, clock.night, beamTarget);
+      fishing?.update(t, realDt, clock.night);
     },
     render: () => {
       renderer.render(s.scene, camera);
@@ -129,9 +131,9 @@ export function start() {
   });
   const ui = new UI({
     onPlace: (id) => selection.select(id),
-    onView: (id) => { selection.deselect(); rig.go(viewFor(id)); ui.markView(id); loop.wake(); },
+    onView: (id) => { fishing?.setActive(false); selection.deselect(); rig.go(viewFor(id)); ui.markView(id); loop.wake(); },
     onTime: (c) => { clock.set(c); loop.wake(); },
-    onClose: () => selection.deselect(),
+    onClose: () => { selection.deselect(); ui.close(); },
   });
   const specs = labelSpecs(s.boats);
   // 银幕：桌面端 3D 一起来就开始循环放（约 1MB）；手机端和「减少动态效果」等访客打开放映台再放
@@ -147,7 +149,27 @@ export function start() {
   const bubbles = createBubbles(labelHost, [...s.residents.actors, ...s.workers.actors], data);
   const clock = createClock({ sky: s.sky, renderer, scene: s.scene, mats: s.mats, lampLights: s.lampLights, screen: s.screen, ui });
   document.fonts?.ready.then(() => labels.measure()).catch((e) => console.warn('[island] 字体加载状态未知，路牌按当前尺寸排布', e));
-  rig.onTap = (x, y) => selection.tap(specs, camera, x, y);
+  // 码头钓鱼：借周伯的竿（角色表里没有他就不开这个玩法）
+  const fishBtn = document.getElementById('isl-fish') as HTMLButtonElement | null, fishHud = document.getElementById('isl-fish-hud');
+  const gearBtn = document.getElementById('isl-gear') as HTMLButtonElement | null, gearCount = document.getElementById('isl-gear-shells');
+  const gearPanel = document.getElementById('isl-gear-panel'), gearList = document.getElementById('isl-gear-list');
+  const gear = gearBtn && gearCount && gearPanel && gearList ? { button: gearBtn, count: gearCount, panel: gearPanel, list: gearList } : null;
+  const fishing = s.residents.angler && fishBtn && fishHud && gear ? createFishing({
+    mats: s.mats, splashes: s.splashes, data, ...s.residents.angler, angler: s.residents.angler.root, ship: s.boats.ship, gear, light: s.lampLights.at(-1) ?? null,
+    openCard: (card) => ui.open(card), closeCard: () => ui.close(), hud: fishHud, button: fishBtn, wake: loop.wake,
+  }) : null;
+  if (fishing) {
+    for (const g of [fishing.group, fishing.bucket]) g.traverse((o) => (o.castShadow = false));
+    s.scene.add(fishing.group, fishing.bucket);
+    s.sea.track(fishing.floaters);
+    fishBtn?.addEventListener('click', () => {
+      if (!fishing.active) return;
+      selection.deselect();
+      ui.markView(null);
+      rig.go(stage.clientWidth < stage.clientHeight ? FISH_VIEW_PORTRAIT : FISH_VIEW);
+    });
+  } else fishBtn?.remove();
+  rig.onTap = (x, y) => (fishing?.active ? fishing.tap(selection.pick(camera, x, y)) : selection.tap(specs, camera, x, y));
   rig.onUserInput = loop.wake;
 
   new ResizeObserver(() => {
@@ -171,7 +193,7 @@ export function start() {
   requestAnimationFrame(() => requestAnimationFrame(() => { if (root.dataset.island !== 'lost') root.dataset.island = 'ready'; }));
 
   if (location.search.includes('island-debug')) {
-    Object.assign(window, { __island: { setHour: (h: number) => clock.set(h), go: (id: string) => rig.go(viewFor(id), { instant: true }), select: selection.select, snap: () => rig.snap(), view: (v: View) => rig.go(v, { instant: true }), info: () => ({ ...renderer.info.render }), swimmers: () => s.sea.swimmers(),
+    Object.assign(window, { __island: { setHour: (h: number) => clock.set(h), go: (id: string) => rig.go(viewFor(id), { instant: true }), select: selection.select, snap: () => rig.snap(), view: (v: View) => rig.go(v, { instant: true }), info: () => ({ ...renderer.info.render }), swimmers: () => s.sea.swimmers(), pond: () => fishing?.pond(),
       cam: () => camera.position.toArray(), tapSea: (x: number, z: number) => { s.sea.tap(x, z); s.splashes.trigger(x, z, TAP_SPLASH, s.sea.time()); }, actor: (n: string) => [...s.residents.actors, ...s.workers.actors].find((a) => a.name === n)?.root.position.toArray(), toScreen: (x: number, y: number, z: number) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x * 0.5 + 0.5) * size.w, (-v.y * 0.5 + 0.5) * size.h]; } } });
   }
 }

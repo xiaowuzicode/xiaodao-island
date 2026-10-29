@@ -92,8 +92,22 @@ export function pier(mats: Materials, parent: THREE.Object3D) {
   for (let z = 23.5; z < 38.5; z += 1.3) put(parent, plank, mats.get(P.wood), 0, 0.95, z);
   const post = new THREE.CylinderGeometry(PIER_POST_RADIUS, PIER_POST_RADIUS, 2.2, 7);
   for (const [x, z] of PIER_POSTS) put(parent, post, mats.get(P.woodDark), x, 0.1, z);
-  // 码头尽头的系船桩和一摞木箱
-  put(parent, new THREE.CylinderGeometry(0.22, 0.26, 0.6, 10), mats.get(P.trim), -1.1, 1.3, 37.6);
+  // 码头尽头的系船桩（挪到左前角、木色，别跟周伯的深绿上衣连成一片）和一摞木箱
+  put(parent, new THREE.CylinderGeometry(0.16, 0.2, 0.5, 10), mats.get(P.woodDark), -1.3, 1.3, 37.75);
   put(parent, roundedBox(0.8, 0.7, 0.8, 0.1), mats.get(P.woodDark), 1, 1.07, 36.6);
   put(parent, roundedBox(0.6, 0.5, 0.6, 0.1), mats.get(P.wood), 1.05, 1.77, 36.6);
+  fishBucket(mats, parent);
+}
+
+/** 周伯的鱼桶：在他右手边（离他半米多，别像他身体的一部分）；钓鱼小游戏把鱼收进这里。xyz 是桶底中心。 */
+export const BUCKET = { x: 0.45, y: 1.08, z: 37.25, r: 0.24, h: 0.42 } as const;
+
+/** 木桶：浅色桶身 + 两道铁箍 + 提手，桶里一层水。 */
+function fishBucket(mats: Materials, parent: THREE.Object3D) {
+  const { x, y, z, r, h } = BUCKET, iron = mats.get('#7d8582');
+  put(parent, new THREE.CylinderGeometry(r, r * 0.84, h, 16, 1, true), mats.get(P.wood, { side: THREE.DoubleSide }), x, y + h / 2, z);
+  put(parent, new THREE.CylinderGeometry(r * 0.84, r * 0.84, 0.03, 16), mats.get(P.woodDark), x, y + 0.015, z);
+  for (const k of [0.22, 0.82]) put(parent, new THREE.TorusGeometry(r * (0.86 + 0.14 * k) + 0.012, 0.016, 5, 20), iron, x, y + h * k, z).rotation.x = Math.PI / 2;
+  put(parent, new THREE.CircleGeometry(r * 0.95, 16), mats.get(P.seaShallow), x, y + h * 0.78, z).rotation.x = -Math.PI / 2;
+  put(parent, new THREE.TorusGeometry(r * 0.95, 0.012, 4, 14, Math.PI), iron, x, y + h, z).rotation.y = Math.PI / 2;
 }
