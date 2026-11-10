@@ -20,6 +20,19 @@
 | ![浅海近景：鳐鱼游过水草、礁石和沙纹](docs/images/ocean-life.jpg) | ![黄昏小岛：灯塔照向海面，岸边灯光亮起](docs/images/island-dusk.jpg) |
 | 海水颜色、折射、沙纹、水草和游动的鱼，都由代码绘制。海水入口：[ocean-glsl.ts](src/island/ocean-glsl.ts)。 | 岛上有昼夜变化、灯塔和海浪声。相关实现都在 [src/island/](src/island/)。 |
 
+## 两个小游戏
+
+| 码头钓鱼 | 啪！拍蚊子 |
+|---|---|
+| ![码头钓鱼：浮标沉下去，鱼咬钩了](docs/images/fishing.jpg) | ![拍蚊子：拍子追着蚊子，连击加分](docs/images/mosquito-play.jpg) |
+| 首页点「钓鱼」接过周伯的鱼竿：甩竿、等鱼影游过来、咬钩时收竿，钓上来的鱼叼着一篇旧文章。代码在 [fishing.ts](src/island/fishing.ts)。 | 30 秒拍蚊子，连着拍中有连击加分。单个 HTML 文件，canvas 画面，[在线玩](https://xiaodao.ai/play/mosquito/)。代码在 [public/play/mosquito/index.html](public/play/mosquito/index.html)。 |
+
+拍蚊子也上架了 B站 Toy，在那里玩能上排行榜：[bilibili.com/toy/paiwenzi](https://www.bilibili.com/toy/paiwenzi/index.html)。同一份代码在 B站 里会加载官方 SDK，交分数、拉排行榜；在别处打开只显示自己的分数，结束时给一个去 B站 的入口。
+
+![拍蚊子结束画面：得分、最高连击和「去 B站 玩，能上排行榜」](docs/images/mosquito-end.jpg)
+
+做这个游戏和上架 Toy 的过程，B 站有一支视频：[《B站点开就能玩的小游戏是怎么做的？拆完我也用 AI 做了一个》](https://www.bilibili.com/video/BV1hP4n6LEHo/)。
+
 ## 跑起来
 
 ```bash
@@ -47,6 +60,7 @@ bun run build      # 产物在 dist/
 |---|---|
 | `src/island/` | 3D 小岛：地形、海水着色器（`ocean-glsl.ts`）、鱼群、灯塔、昼夜、镜头 |
 | `src/island/fishing.ts`、`fishing-gear.ts` | 码头钓鱼小游戏：甩竿、鱼影、咬钩、收进鱼桶；贝壳升级鱼线 / 鱼饵 / 手感（进度存在浏览器里） |
+| `public/play/mosquito/` | 拍蚊子小游戏：单个 HTML，在 B站 Toy 里自动接排行榜 |
 | `src/pages/` | 页面：首页、文章、日报、专题、视频、归档 |
 | `src/lib/topics.ts` | 专题：按标题和摘要里的关键词自动归类 |
 

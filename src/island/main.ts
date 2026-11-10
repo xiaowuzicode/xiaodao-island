@@ -155,7 +155,7 @@ export function start() {
   const gearPanel = document.getElementById('isl-gear-panel'), gearList = document.getElementById('isl-gear-list');
   const gear = gearBtn && gearCount && gearPanel && gearList ? { button: gearBtn, count: gearCount, panel: gearPanel, list: gearList } : null;
   const fishing = s.residents.angler && fishBtn && fishHud && gear ? createFishing({
-    mats: s.mats, splashes: s.splashes, data, ...s.residents.angler, angler: s.residents.angler.root, ship: s.boats.ship, gear, light: s.lampLights.at(-1) ?? null,
+    mats: s.mats, splashes: s.splashes, data, renderer, ...s.residents.angler, angler: s.residents.angler.root, ship: s.boats.ship, gear, light: s.lampLights.at(-1) ?? null,
     openCard: (card) => ui.open(card), closeCard: () => ui.close(), hud: fishHud, button: fishBtn, wake: loop.wake,
   }) : null;
   if (fishing) {
@@ -169,7 +169,8 @@ export function start() {
       rig.go(stage.clientWidth < stage.clientHeight ? FISH_VIEW_PORTRAIT : FISH_VIEW);
     });
   } else fishBtn?.remove();
-  rig.onTap = (x, y) => (fishing?.active ? fishing.tap(selection.pick(camera, x, y)) : selection.tap(specs, camera, x, y));
+  // 钓鱼时点击只看岛（码头、鱼桶）和海面：船开过鱼塘时，点船身就当甩到船后面的海里
+  rig.onTap = (x, y) => (fishing?.active ? fishing.tap(selection.pick(camera, x, y, [s.root])) : selection.tap(specs, camera, x, y));
   rig.onUserInput = loop.wake;
 
   new ResizeObserver(() => {
@@ -193,7 +194,7 @@ export function start() {
   requestAnimationFrame(() => requestAnimationFrame(() => { if (root.dataset.island !== 'lost') root.dataset.island = 'ready'; }));
 
   if (location.search.includes('island-debug')) {
-    Object.assign(window, { __island: { setHour: (h: number) => clock.set(h), go: (id: string) => rig.go(viewFor(id), { instant: true }), select: selection.select, snap: () => rig.snap(), view: (v: View) => rig.go(v, { instant: true }), info: () => ({ ...renderer.info.render }), swimmers: () => s.sea.swimmers(), pond: () => fishing?.pond(),
+    Object.assign(window, { __island: { setHour: (h: number) => clock.set(h), go: (id: string) => rig.go(viewFor(id), { instant: true }), select: selection.select, snap: () => rig.snap(), view: (v: View) => rig.go(v, { instant: true }), info: () => ({ ...renderer.info.render }), swimmers: () => s.sea.swimmers(), pond: () => fishing?.pond(), fishSpawn: (id: string, x?: number, z?: number) => fishing?.debugSpawn(id, x, z), fishState: () => fishing?.state,
       cam: () => camera.position.toArray(), tapSea: (x: number, z: number) => { s.sea.tap(x, z); s.splashes.trigger(x, z, TAP_SPLASH, s.sea.time()); }, actor: (n: string) => [...s.residents.actors, ...s.workers.actors].find((a) => a.name === n)?.root.position.toArray(), toScreen: (x: number, y: number, z: number) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x * 0.5 + 0.5) * size.w, (-v.y * 0.5 + 0.5) * size.h]; } } });
   }
 }

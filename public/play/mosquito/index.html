@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>啪！拍蚊子 · AI小岛</title>
+<meta name="description" content="30 秒能拍多少只？AI 写的网页小游戏，点中蚊子就拍，连着拍中有连击。">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  html, body { margin: 0; height: 100%; background: #10141f; overflow: hidden; touch-action: none; }
+  canvas { display: block; cursor: none; }
+  .home { position: fixed; left: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); font: 600 14px/1 "PingFang SC", system-ui, sans-serif; color: rgba(255,246,220,.75); background: rgba(10,12,20,.55); padding: 8px 12px; border-radius: 999px; text-decoration: none; cursor: pointer; }
+  .home:hover { color: #fff6dc; }
+  .bili { position: fixed; left: 50%; top: 66%; transform: translateX(-50%); display: none; font: 700 18px/1 "PingFang SC", system-ui, sans-serif; color: #2b2233; background: #f2b84b; padding: 12px 20px; border-radius: 999px; text-decoration: none; cursor: pointer; white-space: nowrap; }
+  .bili.on { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<a class="home" href="/">← 回 AI小岛</a>
+<a class="bili" id="bili" href="https://www.bilibili.com/toy/paiwenzi/index.html" target="_blank" rel="noopener">去 B站 玩，能上排行榜 →</a>
+<script>
+// 啪！拍蚊子 —— 30 秒内拍蚊子，连着拍中有连击加分，结束时把分数交到排行榜。
+// 在 B站 Toy 里会调用平台的 toy.submitScore / toy.getRankList；在别处打开时只显示自己的分数。
+
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const FILM_MODE = new URLSearchParams(location.search).has('film');
+let W = 1920, H = 1080, DPR = 1;            // 画面按 1920×1080 设计，整体等比缩放到屏幕里
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1);
+  const k = Math.min(innerWidth / W, innerHeight / H), cw = W * k, ch = H * k;
+  cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+  cv.style.marginLeft = (innerWidth - cw) / 2 + 'px'; cv.style.marginTop = (innerHeight - ch) / 2 + 'px';
+  const q = Math.min(1, (cw * DPR) / W);
+  cv.width = W * q; cv.height = H * q; g.setTransform(q, 0, 0, q, 0, 0);
+}
+resize(); addEventListener('resize', resize);
+
+const GAME_LEN = 30, HIT_R = 80, COMBO_GAP = 1.0;
+
+// 可复现的随机数：同一局在录屏时每次都一样
+function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+function newGame(seed) {
+  return { t: 0, rnd: rng(seed), bugs: [], fx: [], score: 0, combo: 0, best: 0, lastHit: -9,
+           nextSpawn: 0, nextId: 1, over: false, submitted: null, hand: { x: W * .5, y: H * .62, down: 0 } };
+}
+
+function spawn(s) {
+  const r = s.rnd, gold = r() < .08;
+  s.bugs.push({ id: s.nextId++, x: W * (.15 + r() * .7), y: H * (.22 + r() * .5), ph: r() * 6.28,
+                sp: (gold ? 1.7 : 1) * (130 + r() * 90), dir: r() * 6.28, born: s.t, gold });
+}
+
+function step(s, dt) {
+  if (s.over) { stepFx(s, dt); return; }
+  s.t += dt;
+  if (s.t >= GAME_LEN) { s.t = GAME_LEN; s.over = true; s.endAt = s.t; return; }
+  s.nextSpawn -= dt;
+  if (s.bugs.length < 3 || (s.nextSpawn <= 0 && s.bugs.length < 7)) { spawn(s); s.nextSpawn = .45 + s.rnd() * .4; }
+  for (const b of s.bugs) {
+    b.dir += Math.sin(s.t * 2.3 + b.ph) * 2.2 * dt;        // 蚊子是绕着飞的，不走直线
+    b.x += Math.cos(b.dir) * b.sp * dt; b.y += Math.sin(b.dir) * b.sp * .7 * dt;
+    if (b.x < 80 || b.x > W - 80) b.dir = Math.PI - b.dir;
+    if (b.y < 140 || b.y > H - 120) b.dir = -b.dir;
+    b.x = Math.max(80, Math.min(W - 80, b.x)); b.y = Math.max(140, Math.min(H - 120, b.y));
+  }
+  stepFx(s, dt);
+}
+function stepFx(s, dt) { for (const f of s.fx) f.age += dt; s.fx = s.fx.filter(f => f.age < f.life); }
+
+// 一次点击：拍中最近的那只，连着拍中就连击
+function swat(s, x, y) {
+  if (s.over) return;
+  s.hand.down = .12;
+  let hit = null, hd = HIT_R;
+  for (const b of s.bugs) { const d = Math.hypot(b.x - x, b.y - y); if (d < hd) { hd = d; hit = b; } }
+  if (hit) {
+    s.combo = s.t - s.lastHit < COMBO_GAP ? s.combo + 1 : 1; s.lastHit = s.t;
+    const pts = (hit.gold ? 50 : 10) * Math.min(s.combo, 5);
+    s.score += pts; s.best = Math.max(s.best, s.combo);
+    s.bugs = s.bugs.filter(b => b !== hit);
+    s.fx.push({ kind: 'splat', x: hit.x, y: hit.y, age: 0, life: 1.6, gold: hit.gold });
+    s.fx.push({ kind: 'text', x: hit.x, y: hit.y - 40, age: 0, life: .8, text: s.combo > 1 ? `+${pts}  连击 ×${Math.min(s.combo, 5)}` : `+${pts}`, gold: hit.gold });
+    sound('slap');
+  } else {
+    s.combo = 0;
+    s.fx.push({ kind: 'text', x, y: y - 30, age: 0, life: .6, text: '没拍到', miss: true });
+    sound('whoosh');
+  }
+}
+
+// ---------- 画面 ----------
+function drawRoom(t) {
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#1b2236'); sky.addColorStop(1, '#2a2430');
+  g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  const lamp = g.createRadialGradient(W * .82, H * .18, 10, W * .82, H * .18, H * .9);   // 台灯的暖光
+  lamp.addColorStop(0, 'rgba(255,214,150,.55)'); lamp.addColorStop(1, 'rgba(255,214,150,0)');
+  g.fillStyle = lamp; g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(255,255,255,.035)';                                               // 墙纸竖纹
+  for (let x = 0; x < W; x += 64) g.fillRect(x, 0, 2, H);
+  g.fillStyle = "#0d1322"; g.fillRect(W * .07, H * .14, W * .2, H * .42);                // 窗户和月亮
+  g.fillStyle = "#f4e7c2"; g.beginPath(); g.arc(W * .2, H * .25, 34, 0, 6.28); g.fill();
+  g.strokeStyle = "#5a4a52"; g.lineWidth = 10; g.strokeRect(W * .07, H * .14, W * .2, H * .42);
+  g.beginPath(); g.moveTo(W * .17, H * .14); g.lineTo(W * .17, H * .56); g.moveTo(W * .07, H * .35); g.lineTo(W * .27, H * .35); g.stroke();
+  g.fillStyle = '#3a2f33'; g.fillRect(0, H - 90, W, 90);                                // 床沿
+  g.fillStyle = '#8a6b8f'; g.fillRect(0, H - 90, W, 10);
+}
+
+function drawBug(b, t) {
+  const flap = Math.sin(t * 60 + b.ph) * .5 + .5, s = b.gold ? 3.2 : 2.8;
+  g.save(); g.translate(b.x, b.y); g.rotate(Math.cos(b.dir) > 0 ? .15 : -.15); g.scale(Math.cos(b.dir) > 0 ? 1 : -1, 1); g.scale(s, s);
+  g.fillStyle = 'rgba(220,235,255,.45)';                                                // 翅膀
+  g.beginPath(); g.ellipse(-4, -14, 16, 7 + flap * 5, -.6, 0, 6.28); g.fill();
+  g.beginPath(); g.ellipse(6, -14, 14, 6 + flap * 4, .5, 0, 6.28); g.fill();
+  g.strokeStyle = '#1a1416'; g.lineWidth = 2;                                           // 腿
+  for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(i * 6, 4); g.lineTo(i * 10 - 4, 20); g.stroke(); }
+  g.fillStyle = b.gold ? '#f2b84b' : '#3b2e2c';                                         // 身体
+  g.beginPath(); g.ellipse(-10, 2, 16, 6, .15, 0, 6.28); g.fill();
+  g.beginPath(); g.arc(9, 0, 7, 0, 6.28); g.fill();
+  g.strokeStyle = b.gold ? '#f2b84b' : '#3b2e2c'; g.lineWidth = 2.5;                    // 嘴
+  g.beginPath(); g.moveTo(15, 1); g.lineTo(30, 6); g.stroke();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(11, -2, 2.2, 0, 6.28); g.fill();
+  g.restore();
+}
+
+function drawFx(f) {
+  const k = f.age / f.life;
+  if (f.kind === 'splat') {
+    g.save(); g.globalAlpha = 1 - k * k; g.translate(f.x, f.y);
+    g.fillStyle = f.gold ? '#f2b84b' : '#7a2b2b';
+    for (let i = 0; i < 7; i++) { const a = i * .9, r = 10 + (i % 3) * 6; g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, 5 - (i % 3), 0, 6.28); g.fill(); }
+    g.beginPath(); g.arc(0, 0, 9, 0, 6.28); g.fill();
+    if (f.age < .25) { g.globalAlpha = 1 - f.age / .25; g.fillStyle = '#fff6dc'; g.font = '900 64px "PingFang SC", sans-serif'; g.textAlign = 'center'; g.fillText('啪！', 0, -50 - f.age * 80); }
+    g.restore();
+  } else {
+    g.save(); g.globalAlpha = 1 - k; g.font = `800 ${f.miss ? 30 : 38}px "PingFang SC", sans-serif`; g.textAlign = 'center';
+    g.fillStyle = f.miss ? 'rgba(255,255,255,.7)' : f.gold ? '#f2b84b' : '#ffe08a';
+    g.fillText(f.text, f.x, f.y - k * 50); g.restore();
+  }
+}
+
+function drawSwatter(h) {
+  const press = h.down > 0 ? 1 : 0;
+  g.save(); g.translate(h.x, h.y); g.rotate(-.5 + press * .35); g.scale(1 - press * .12, 1 - press * .12);
+  g.fillStyle = '#c98a3a'; g.fillRect(-6, 30, 12, 150);                                // 把手
+  g.fillStyle = 'rgba(80,200,180,.85)'; g.strokeStyle = '#1f6f64'; g.lineWidth = 5;      // 拍面
+  g.beginPath(); g.roundRect(-46, -50, 92, 86, 18); g.fill(); g.stroke();
+  g.strokeStyle = 'rgba(20,80,72,.5)'; g.lineWidth = 2;
+  for (let i = -36; i <= 36; i += 12) { g.beginPath(); g.moveTo(i, -46); g.lineTo(i, 32); g.stroke(); g.beginPath(); g.moveTo(-42, i * .9 - 6); g.lineTo(42, i * .9 - 6); g.stroke(); }
+  g.restore();
+}
+
+function drawHud(s) {
+  g.save(); g.font = '800 44px "PingFang SC", sans-serif'; g.fillStyle = '#fff6dc'; g.textBaseline = 'top';
+  g.fillText(`得分 ${s.score}`, 60, 40);
+  if (s.combo > 1 && s.t - s.lastHit < COMBO_GAP) { g.fillStyle = '#ffe08a'; g.fillText(`连击 ×${Math.min(s.combo, 5)}`, 60, 96); }
+  const left = Math.max(0, GAME_LEN - s.t);
+  g.textAlign = 'right'; g.fillStyle = left < 5 ? '#ff8a6a' : '#fff6dc'; g.fillText(`${left.toFixed(1)} 秒`, W - 60, 40);
+  g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(W - 360, 100, 300, 12);
+  g.fillStyle = left < 5 ? '#ff8a6a' : '#3fb6a8'; g.fillRect(W - 360, 100, 300 * left / GAME_LEN, 12);
+  g.restore();
+}
+
+function drawEnd(s) {
+  const k = Math.min(1, (s.t2 ?? 0) / .5);
+  g.save(); g.globalAlpha = k; g.fillStyle = 'rgba(10,12,20,.72)'; g.fillRect(0, 0, W, H);
+  g.textAlign = 'center'; g.fillStyle = '#fff6dc'; g.font = '900 96px "PingFang SC", sans-serif';
+  g.fillText('时间到！', W / 2, H * .3);
+  g.font = '800 60px "PingFang SC", sans-serif'; g.fillStyle = '#ffe08a';
+  g.fillText(`得分 ${s.score}　最高连击 ×${Math.min(s.best, 5)}`, W / 2, H * .3 + 100);
+  g.font = '600 34px "PingFang SC", sans-serif'; g.fillStyle = 'rgba(255,255,255,.6)'; g.fillText('点一下再来一局', W / 2, H * .88);
+  const board = s.submitted?.board || [];
+  if (s.submitted?.none) { g.restore(); return; }          // 没有平台接口时不画排行榜
+  const x0 = W / 2 - 330, y0 = H * .3 + 170;
+  g.fillStyle = 'rgba(255,255,255,.08)'; g.beginPath(); g.roundRect(x0, y0, 660, 70 + board.length * 64, 20); g.fill();
+  g.font = '700 34px "PingFang SC", sans-serif'; g.fillStyle = 'rgba(255,255,255,.75)'; g.textAlign = 'left';
+  g.fillText(s.submitted?.failed ? '排行榜暂时连不上，稍后再试' : board.length ? '排行榜' : '还没人上榜，你是第一个', x0 + 30, y0 + 46);
+  board.forEach((r, i) => {
+    g.fillStyle = r.me ? '#f2b84b' : '#fff6dc'; g.font = `${r.me ? 800 : 600} 38px "PingFang SC", sans-serif`;
+    g.textAlign = 'left'; g.fillText(r.name, x0 + 30, y0 + 110 + i * 64);
+    g.textAlign = 'right'; g.fillText(String(r.score), x0 + 630, y0 + 110 + i * 64);
+  });
+  if (s.submitted?.mine) { g.textAlign = 'center'; g.font = '700 34px "PingFang SC", sans-serif'; g.fillStyle = '#ffe08a'; g.fillText(s.submitted.mine, W / 2, y0 + 70 + board.length * 64 + 56); }
+  g.restore();
+}
+
+const biliLink = document.getElementById('bili');
+function render(s) {
+  if (biliLink) biliLink.classList.toggle('on', !!(s.over && s.submitted?.none && (s.t2 ?? 0) > 0.6));
+  drawRoom(s.t); for (const b of s.bugs) drawBug(b, s.t); for (const f of s.fx) drawFx(f);
+  drawHud(s); if (s.over) drawEnd(s); else drawSwatter(s.hand);
+  if (innerHeight > innerWidth) { g.save(); g.fillStyle = 'rgba(10,12,20,.6)'; g.fillRect(0, H * .42, W, 150); g.fillStyle = '#fff6dc'; g.font = '800 72px "PingFang SC", sans-serif'; g.textAlign = 'center'; g.fillText('横过来玩更爽 ↻', W / 2, H * .42 + 102); g.restore(); }
+}
+
+// ---------- 排行榜：只在 B站 Toy 里有 ----------
+// 官方 SDK 放在 B站 自己的静态资源上；只在 Toy 里加载（别的地方打开就不显示排行榜）
+const TOY_SDK = 'https://s1.hdslb.com/bfs/seed/toy/app/sdk/toy-sdk.js';
+const IN_TOY = /(^|\.)bilibilitoy\.com$/.test(location.hostname) || /(^|\.)bilibili\.com$/.test(location.hostname);
+let sdkLoading = null;
+function loadToy() {
+  if (window.toy) return Promise.resolve(window.toy);
+  if (!IN_TOY) return Promise.reject(new Error('not in toy'));
+  sdkLoading = sdkLoading || new Promise((ok, bad) => {
+    const el = document.createElement('script'), timer = setTimeout(() => bad(new Error('timeout')), 8000);
+    el.src = TOY_SDK; el.onload = () => { clearTimeout(timer); window.toy ? ok(window.toy) : bad(new Error('no toy')); };
+    el.onerror = () => { clearTimeout(timer); sdkLoading = null; bad(new Error('load failed')); };
+    document.head.append(el);
+  });
+  return sdkLoading;
+}
+if (IN_TOY) loadToy().catch(() => {});
+
+// 一局结束交一次分，再拉前 5 名和自己的名次
+async function submit(s) {
+  let toy;
+  try { toy = await loadToy(); } catch (e) { s.submitted = { none: true, board: [] }; return; }
+  try {
+    if (s.score > 0) await toy.submitScore({ board: 1, score: s.score });
+    const [list, mine] = await Promise.all([toy.getRankList({ board: 1, period: 'all', limit: 5 }), toy.getMyRank({ board: 1, period: 'all' }).catch(() => null)]);
+    const rows = (Array.isArray(list) ? list : []).filter(r => Number.isInteger(r.rank) && Number.isFinite(r.score)).slice(0, 5);
+    s.submitted = { board: rows.map(r => ({ name: `${r.rank}　${String(r.nickname || '未设置昵称').slice(0, 10)}`, score: r.score, me: !!(mine && mine.ranked && mine.rank === r.rank) })),
+                    mine: mine && mine.ranked ? `我的排名：第 ${mine.rank} 名 · 最高 ${mine.score} 分` : '登录 B站 后可以上榜' };
+  } catch (e) { s.submitted = { failed: true, board: [] }; }
+}
+
+// ---------- 声音（真玩的时候才有；录屏的声音另外合成） ----------
+let ac = null;
+function sound(kind) {
+  if (FILM_MODE) return;
+  try {
+    ac = ac || new AudioContext(); const o = ac.createOscillator(), v = ac.createGain(), n = ac.currentTime;
+    if (kind === 'slap') { o.type = 'square'; o.frequency.setValueAtTime(180, n); o.frequency.exponentialRampToValueAtTime(60, n + .08); }
+    else { o.type = 'sine'; o.frequency.setValueAtTime(500, n); o.frequency.exponentialRampToValueAtTime(900, n + .1); }
+    v.gain.setValueAtTime(.25, n); v.gain.exponentialRampToValueAtTime(.001, n + .12);
+    o.connect(v); v.connect(ac.destination); o.start(n); o.stop(n + .13);
+  } catch (e) {}
+}
+
+// ---------- 真玩 ----------
+if (!FILM_MODE) {
+  let s = newGame(Date.now() & 0xffff), last = performance.now();
+  const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height]; };
+  cv.addEventListener('pointermove', e => { [s.hand.x, s.hand.y] = pos(e); });
+  cv.addEventListener('pointerdown', e => {
+    if (s.over && (s.t2 ?? 0) > 1) { s = newGame(Date.now() & 0xffff); return; }
+    const [x, y] = pos(e); s.hand.x = x; s.hand.y = y; swat(s, x, y);
+  });
+  (function loop(now) {                                    // 游戏循环：读输入 → 更新状态 → 画一帧
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    if (s.over) { s.t2 = (s.t2 ?? 0) + dt; if (!s.submitted && s.t2 > .3) { s.submitted = { board: [] }; submit(s); } }
+    step(s, dt); s.hand.down = Math.max(0, s.hand.down - dt); render(s);
+    requestAnimationFrame(loop);
+  })(last);
+}
+
+</script>
+</body>
+</html>

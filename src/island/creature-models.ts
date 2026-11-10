@@ -1,5 +1,5 @@
 /**
- * 会露出水面的动物模型：海豚、跳鱼（金鱼）、鲸、礁鲨背鳍。
+ * 会露出水面的动物模型：海豚、跳鱼（金鱼）、鲸、礁鲨背鳍（钓鱼能钓上来的其它生物在 fishing-models.ts，共用这里的零件）。
  * 软陶风：车削出流线身体，鳍用挤出的薄片；颜色写在顶点上（背深腹浅的"反荫蔽"渐变），每只合成一两个网格。
  * 身体头朝 +x、背朝 +y；会摆的尾巴单独成网格，挂在 tail 组上由动画转动。
  */
@@ -7,10 +7,10 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Materials } from '@/island/geo';
 
-type Shade = (p: THREE.Vector3, n: THREE.Vector3) => THREE.Color;
+export type Shade = (p: THREE.Vector3, n: THREE.Vector3) => THREE.Color;
 
 /** 给几何体刷顶点色：固定色，或按位置/法线现算。 */
-function paint(geo: THREE.BufferGeometry, c: string | Shade) {
+export function paint(geo: THREE.BufferGeometry, c: string | Shade) {
   const g = geo.index ? geo.toNonIndexed() : geo;
   for (const name of Object.keys(g.attributes)) if (name !== 'position' && name !== 'normal') g.deleteAttribute(name);
   const pos = g.attributes.position, nor = g.attributes.normal, out = new Float32Array(pos.count * 3);
@@ -24,13 +24,13 @@ function paint(geo: THREE.BufferGeometry, c: string | Shade) {
 }
 
 /** 背腹渐变：法线朝上取背色、朝下取腹色，侧面柔和过渡。bias 往上挪分界线。 */
-function countershade(back: string, belly: string, bias = 0): Shade {
+export function countershade(back: string, belly: string, bias = 0): Shade {
   const b = new THREE.Color(back), w = new THREE.Color(belly), out = new THREE.Color();
   return (_p, n) => out.copy(w).lerp(b, THREE.MathUtils.smoothstep(n.y - bias, -0.4, 0.35));
 }
 
 /** 车削身体：profile 是 [半径, 沿身体的位置] 从尾到头；squash 把横截面压扁成 [高, 宽] 比例。 */
-function lathe(profile: [number, number][], squash: [number, number] = [1, 1], segs = 18) {
+export function lathe(profile: [number, number][], squash: [number, number] = [1, 1], segs = 18) {
   const g = new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(Math.max(r, 0.001), y)), segs);
   g.rotateZ(-Math.PI / 2);
   g.scale(1, squash[0], squash[1]);
@@ -38,7 +38,7 @@ function lathe(profile: [number, number][], squash: [number, number] = [1, 1], s
 }
 
 /** 鳍：一个轮廓挤出成薄片（立在 xy 平面）；flat=true 时放平到 xz 平面（尾叶、胸鳍）。 */
-function fin(pts: [number, number][], thick: number, flat = false) {
+export function fin(pts: [number, number][], thick: number, flat = false) {
   const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
   const g = new THREE.ExtrudeGeometry(s, { depth: thick, bevelEnabled: true, bevelThickness: thick * 0.4, bevelSize: thick * 0.5, bevelSegments: 2, curveSegments: 6 });
   g.translate(0, 0, -thick / 2);
@@ -46,12 +46,12 @@ function fin(pts: [number, number][], thick: number, flat = false) {
   return g;
 }
 
-const at = (g: THREE.BufferGeometry, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0) =>
+export const at = (g: THREE.BufferGeometry, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0) =>
   g.rotateX(rx).rotateY(ry).rotateZ(rz).translate(x, y, z);
 
-const eye = (x: number, y: number, z: number, r: number) => at(new THREE.SphereGeometry(r, 8, 6), x, y, z);
+export const eye = (x: number, y: number, z: number, r: number) => at(new THREE.SphereGeometry(r, 8, 6), x, y, z);
 
-function mesh(mats: Materials, parts: THREE.BufferGeometry[]) {
+export function mesh(mats: Materials, parts: THREE.BufferGeometry[]) {
   const g = mergeGeometries(parts, false);
   parts.forEach((p) => p.dispose());
   if (!g) throw new Error('[island] creature-models: 合并动物零件失败');
@@ -61,11 +61,11 @@ function mesh(mats: Materials, parts: THREE.BufferGeometry[]) {
 }
 
 /** 鱼形：左右对称的尾叶轮廓（上下两瓣），x 往后为负。 */
-const FLUKE: [number, number][] = [[0, 0], [-0.12, 0.17], [-0.28, 0.38], [-0.38, 0.36], [-0.3, 0.13], [-0.33, 0], [-0.3, -0.13], [-0.38, -0.36], [-0.28, -0.38], [-0.12, -0.17]];
+export const FLUKE: [number, number][] = [[0, 0], [-0.12, 0.17], [-0.28, 0.38], [-0.38, 0.36], [-0.3, 0.13], [-0.33, 0], [-0.3, -0.13], [-0.38, -0.36], [-0.28, -0.38], [-0.12, -0.17]];
 
 export interface Creature { root: THREE.Group; tail: THREE.Group }
 
-function assemble(mats: Materials, body: THREE.BufferGeometry[], tail: THREE.BufferGeometry[], tailX: number): Creature {
+export function assemble(mats: Materials, body: THREE.BufferGeometry[], tail: THREE.BufferGeometry[], tailX: number): Creature {
   const root = new THREE.Group(), pivot = new THREE.Group();
   root.add(mesh(mats, body), pivot);
   pivot.position.x = tailX;

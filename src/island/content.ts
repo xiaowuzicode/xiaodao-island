@@ -3,7 +3,7 @@
  * 文章与日报来自构建时注入的数据（index.astro），课程与视频链接在 LINKS 里手工维护。
  */
 import type { View } from '@/island/config';
-import { BILIBILI_SPACE, ISLAND_FILM, RECENT_VIDEOS, videoUrl } from '@/island/videos';
+import { BILIBILI_SPACE, FEATURED, ISLAND_FILM, RECENT_VIDEOS, videoUrl } from '@/island/videos';
 
 export interface IslandPost { title: string; summary: string; date: string; url: string }
 export interface IslandDaily { date: string; issueNo: number; count: number; url: string; headlines: string[] }
@@ -21,9 +21,6 @@ export interface IslandTopic { slug: string; name: string; count: number; url: s
 
 /** 外部链接。值为 null 表示还没有可公开的地址：卡片不出按钮，只写"即将上架"。 */
 export const LINKS = {
-  piCourse: 'https://www.bilibili.com/cheese/play/ss918087467',
-  /** Agent 工程课：2026-10-05 在 B 站课堂上线。 */
-  agentCourse: 'https://www.bilibili.com/cheese/play/ss226962156' as string | null,
   bilibili: BILIBILI_SPACE,
 };
 /** 公众号二维码（public/island/wechat-qr.jpg，344×344）。 */
@@ -90,36 +87,31 @@ export const PLACES: Place[] = [
   {
     id: 'keeper', name: '岛主小屋', anchor: [-2, 9.8, -3], dock: true,
     view: { look: [-3, 6, -4], dist: 38, az: 0.9, tilt: 0.52 },
+    // 岛主小屋管「关注」：二维码放大放前面，按钮直接去 B 站关注；课程都在船坞，这里不重复
     card: () => ({
-      eyebrow: 'ISLAND KEEPER · 关于',
+      eyebrow: 'ISLAND KEEPER · 关注岛主',
       title: '岛主小屋',
-      lede: 'AI Harness 工程师，在创业公司给大模型搭脚手架。写一线实战、踩坑与判断，偶尔泼冷水。',
-      image: { src: WECHAT_QR, alt: '公众号「小岛AI」二维码', caption: '微信扫码关注公众号「小岛AI」', size: 150 },
+      lede: '岛主是给大模型搭脚手架的工程师，写一线实战、踩坑与判断。想常来看看，就关注一下：公众号发文章，B 站放动画和课。',
+      image: { src: WECHAT_QR, alt: '公众号「小岛AI」二维码', caption: '微信扫码关注公众号「小岛AI」', size: 180 },
       items: [
-        { label: 'B 站', sub: '胖胖不胖的AI小岛', url: LINKS.bilibili },
-        { label: 'RSS 订阅', sub: '/rss.xml', url: '/rss.xml' },
-        { label: '给 AI 读的站点说明', sub: '/llms.txt', url: '/llms.txt' },
+        { label: 'B 站关注「胖胖不胖的AI小岛」', sub: '彩铅动画、新课预告', url: LINKS.bilibili },
+        { label: 'RSS 订阅', sub: '用阅读器收新文章 · /rss.xml', url: '/rss.xml' },
       ],
-      cta: { label: '认识岛主', url: '/about/' },
+      cta: { label: '去 B 站关注', url: LINKS.bilibili, external: true },
+      links: [{ label: '认识岛主', url: '/about/' }, { label: '给 AI 读的站点说明', url: '/llms.txt' }],
     }),
   },
   {
     id: 'shipyard', name: '船坞', anchor: [-25, 7.8, 9], dock: true,
     view: { look: [-24, 2.5, 10], dist: 36, az: -0.9, tilt: 0.4 },
-    card: () => {
-      return {
-        eyebrow: 'SHIPYARD · 课程',
-        title: '课程船坞',
-        lede: '造一艘船，就是造一个 Agent。已经下水的两门课可以直接上船；船台上那艘，是下一门课。',
-        items: [
-          { label: 'AI Agent 是怎么造出来的：拆开开源 Pi', sub: '已下水 · B 站课堂', url: LINKS.piCourse },
-          { label: '先看 56 秒免费预告', sub: 'B 站 · 2026-09-27', url: videoUrl('BV17Ma86wEbA') },
-          { label: 'Agent 工程课：把 AI 做成能用的产品', sub: LINKS.agentCourse ? '已下水 · B 站课堂' : '在建 · 即将在 B 站上架', url: LINKS.agentCourse },
-          { label: '先看 47 秒预告', sub: 'B 站 · 2026-10-03', url: videoUrl('BV1RMYF6rE5J') },
-        ],
-        cta: { label: '去 B 站看课程', url: LINKS.piCourse, external: true },
-      };
-    },
+    // 船坞管「课程」：水面上一艘船一门课（landmarks.ts 按 FEATURED 摆船），卡片也按 FEATURED 列
+    card: () => ({
+      eyebrow: 'SHIPYARD · 课程',
+      title: '课程船坞',
+      lede: `造一艘船，就是造一个 Agent。水面上泊着的 ${FEATURED.length} 艘船是已经上线的 ${FEATURED.length} 门课，点一门直接去 B 站课堂；船台上那艘，是下一门课。`,
+      items: FEATURED.map((c) => ({ label: c.title, sub: c.url ? c.status : '在建 · 即将在 B 站上架', url: c.url })),
+      cta: { label: '看课程介绍和免费预告', url: '/videos/' },
+    }),
   },
   {
     id: 'cinema', name: '放映台', anchor: [12, 6.6, 8], dock: true,

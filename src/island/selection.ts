@@ -71,12 +71,12 @@ export function createSelection(d: Deps) {
 
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   const sea = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-  /** 点击位置在世界里落到哪：先打岛上的东西和船，打不中就落到海面（water=true）；朝天上点返回 null。 */
-  function pick(camera: THREE.Camera, x: number, y: number) {
+  /** 点击位置在世界里落到哪：先打岛上的东西和船（或只打 objects 里的），打不中就落到海面（water=true）；朝天上点返回 null。 */
+  function pick(camera: THREE.Camera, x: number, y: number, objects: THREE.Object3D[] = d.pickables) {
     const r = d.stage.getBoundingClientRect();
     ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const hit = ray.intersectObjects(d.pickables, true)[0];
+    const hit = ray.intersectObjects(objects, true)[0];
     if (hit) return { p: hit.point, water: false, obj: hit.object };
     const p = ray.ray.intersectPlane(sea, new THREE.Vector3());
     return p ? { p, water: true, obj: null } : null;

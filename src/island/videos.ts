@@ -15,16 +15,27 @@ export const ISLAND_FILM = { bvid: 'BV1WJpE6QE21', title: '这不是游戏，是
 /** 封面已下载压缩到 public/videos/<bvid>.webp（480 宽），不从 B 站热链。 */
 export const videoCover = (bvid: string) => `/videos/${bvid}.webp`;
 
-/** 主推课程：固定排在最前面的位置（视频页、日报页、岛上船坞都用这一份）。url 为 null 表示还没上架。 */
-export interface Featured { id: string; title: string; subtitle: string; status: string; url: string | null; cover: string; trailer?: string; trailerLabel?: string }
+/**
+ * 主推课程：固定排在最前面的位置（视频页、日报页、岛上船坞都用这一份），新上的排前面。url 为 null 表示还没上架。
+ * short：船坞里一艘船对一门课，船帆小旗上写的短名。
+ */
+export interface Featured { id: string; title: string; short: string; subtitle: string; status: string; url: string | null; cover: string; trailer?: string; trailerLabel?: string }
 export const FEATURED: Featured[] = [
   {
-    id: 'pi', title: 'AI Agent 是怎么造出来的：拆开开源 Pi', subtitle: '用彩铅动画一集拆开 pi 的一个设计决定，看懂一个能干活的 AI 编程 Agent 是怎么搭起来的。',
-    status: '已上线 · B 站课堂', url: 'https://www.bilibili.com/cheese/play/ss918087467', cover: '/videos/pi-course.webp', trailer: 'BV17Ma86wEbA', trailerLabel: 'Pi 课 56 秒免费预告',
+    id: 'llm', title: '大模型是怎么工作的？从 Token 到 Agent', short: '大模型原理课', subtitle: '15 集彩铅动画，跟着「灯塔几点亮？」这一句话，走完它在模型里的一生。只讲不会过时的原理。',
+    status: '已上线 · B 站课堂', url: 'https://www.bilibili.com/cheese/play/ss598725235', cover: '/videos/llm-course.webp', trailer: 'BV1gQ4w6hExp', trailerLabel: '大模型原理课预告',
   },
   {
-    id: 'agent', title: 'Agent 工程课：把 AI 做成能用的产品', subtitle: '一套 14 集的彩铅动画视频课。造一艘船，就是造一个 Agent。',
-    status: '已上线 · B 站课堂', url: 'https://www.bilibili.com/cheese/play/ss226962156', cover: '/videos/agent-course.webp', trailer: 'BV1RMYF6rE5J', trailerLabel: 'Agent 工程课 47 秒预告',
+    id: 'vibe', title: 'Vibe Coding 入门课：把想法做出来', short: 'Vibe Coding 入门课', subtitle: '不会写代码，也能用 AI 编程工具做出东西。15 集动画，一集讲透一个上手技巧。',
+    status: '已上线 · B 站课堂', url: 'https://www.bilibili.com/cheese/play/ss839555536', cover: '/videos/vibe-course.webp', trailer: 'BV1dPxn6nErE', trailerLabel: 'Vibe Coding 入门课预告',
+  },
+  {
+    id: 'agent', title: 'Agent 工程课：把 AI 做成能用的产品', short: 'Agent 工程课', subtitle: '一套 14 集的彩铅动画视频课。造一艘船，就是造一个 Agent。',
+    status: '已上线 · B 站课堂', url: 'https://www.bilibili.com/cheese/play/ss226962156', cover: '/videos/agent-course.webp', trailer: 'BV1RMYF6rE5J', trailerLabel: 'Agent 工程课预告',
+  },
+  {
+    id: 'pi', title: 'AI Agent 是怎么造出来的：拆开开源 Pi', short: 'Pi 设计课', subtitle: '用彩铅动画一集拆开 pi 的一个设计决定，看懂一个能干活的 AI 编程 Agent 是怎么搭起来的。',
+    status: '已上线 · B 站课堂', url: 'https://www.bilibili.com/cheese/play/ss918087467', cover: '/videos/pi-course.webp', trailer: 'BV17Ma86wEbA', trailerLabel: 'Pi 课预告',
   },
 ];
 

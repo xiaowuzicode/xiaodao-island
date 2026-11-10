@@ -4,6 +4,7 @@ import { LEVEL, PALETTE as P } from '@/island/config';
 import { Materials, gableRoof, put, roundedBox, seeded } from '@/island/geo';
 import { house, picketFence, porchLamp } from '@/island/buildings';
 import { sailboat } from '@/island/boats';
+import { FEATURED } from '@/island/videos';
 import { awning, sign, signTexture } from '@/island/signs';
 import { CHAIR_SEAT, CINEMA, CINEMA_CHAIRS, PRESS_POS } from '@/island/layout';
 import { SATELLITE_LEVEL, groundY } from '@/island/terrain';
@@ -50,7 +51,12 @@ export function keeper(mats: Materials, parent: THREE.Object3D) {
 /** 泊在水面上的船，船底离海平面的高度。 */
 const SHIP_WATERLINE = -0.15;
 
-/** 船坞：开口朝海的船棚，滑道上一艘造到一半的船（在建的课：Agent 工程课），水面泊着一艘造好的船（已上线的课：Pi 设计课）。 */
+/** 船坞外泊船的位置（船棚局部 x，滑道在 x=0）和船身条纹颜色；已上线的课多于这几个位置时，只泊最新的几门。 */
+const MOORED: [number, string][] = [[-2.6, P.roofRed], [2.6, P.roofBlue], [-5.8, P.roofGreen], [5.8, P.roofYellow]];
+/** 船帆小旗上的字；没写的取课程短名的第一个字。 */
+const FLAG: Record<string, string> = { pi: 'π', agent: 'A', vibe: 'V', llm: '模' };
+
+/** 船坞：开口朝海的船棚，滑道上一艘造到一半的船（下一门课），水面上一门已上线的课泊一艘造好的船。 */
 export function shipyard(mats: Materials, parent: THREE.Object3D) {
   const x = -25, z = 9, y = groundY(x, z);
   const g = new THREE.Group();
@@ -61,13 +67,16 @@ export function shipyard(mats: Materials, parent: THREE.Object3D) {
   for (const sx of [-3.05, 3.05]) put(g, roundedBox(0.3, 3.4, 5.6, 0.1), mats.get(P.wall), sx, 0, 0);
   put(g, gableRoof(7.2, 6.4, 2.1), mats.get(P.roofBlue), 0, 3.35, 0);
   sign(g, 'SHIPYARD · 课程船坞', 4.2, 0.62, 0, 3.0, 3.25, { bg: P.trim, fg: P.paper, border: P.roofYellow });
-  // 已经下水的船 = 已上线的课（Pi 设计课），泊在船台外的水面上；船帆上挂 π 旗
-  const done = sailboat(mats, P.roofBlue, 1.1);
-  done.position.set(3.4, SHIP_WATERLINE - y, 6.2);
-  done.rotation.y = -Math.PI / 2;
-  g.add(done);
-  sign(done, 'π', 0.42, 0.42, 0.5, 4.75, 0.04, { bg: P.roofRed, fg: P.paper });
-  put(g, new THREE.CylinderGeometry(0.16, 0.2, 1.4, 8), mats.get(P.woodDark), 2.0, -0.6, 6.0);
+  // 已经下水的船 = 已上线的课，一门一艘，分两边泊在船台外的水面上（中间留出滑道）；船帆上的小旗写课程的一个字
+  FEATURED.filter((c) => c.url).slice(0, MOORED.length).forEach((c, i) => {
+    const [mx, color] = MOORED[i];
+    const done = sailboat(mats, color, 0.95);
+    done.position.set(mx, SHIP_WATERLINE - y, 8.4);
+    done.rotation.y = -Math.PI / 2;
+    g.add(done);
+    sign(done, FLAG[c.id] ?? c.short.slice(0, 1), 0.42, 0.42, 0.5, 4.75, 0.04, { bg: P.trim, fg: P.paper });
+  });
+  for (const sx of [-4.2, 4.2]) put(g, new THREE.CylinderGeometry(0.16, 0.2, 1.4, 8), mats.get(P.woodDark), sx, -0.6, 6.6);
   for (const sx of [-0.7, 0.7]) put(g, new THREE.BoxGeometry(0.2, 0.15, 8), mats.get(P.woodDark), sx, 0.05, 1.2);
   put(g, new THREE.BoxGeometry(0.25, 0.25, 4.6), mats.get(P.wood), 0, 0.5, 0.4);
   const rib = new THREE.TorusGeometry(1.0, 0.09, 6, 16, Math.PI);

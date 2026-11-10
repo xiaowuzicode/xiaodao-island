@@ -50,7 +50,7 @@ function atShop(kind: ShopKind, lx: number, lz: number, face: 'in' | 'out'): [nu
 }
 const ground = ([x, z]: [number, number, number]) => groundY(x, z);
 
-/** 船坞：船台旁边给新船（Agent 工程课）刷漆的位置，面朝船骨。 */
+/** 船坞：船台旁边给新船（下一门课）刷漆的位置，面朝船骨。 */
 const SHIPYARD = { x: -25, z: 9, rot: -Math.PI * 0.45 } as const;
 const PAINTER_AT: [number, number, number] = [...toWorld(SHIPYARD.x, SHIPYARD.z, SHIPYARD.rot, -1.5, 0.6), SHIPYARD.rot + Math.PI / 2];
 
