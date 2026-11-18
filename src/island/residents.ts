@@ -89,7 +89,8 @@ interface Jogger { fig: Figure; a: number; dir: 1 | -1; phase: number }
 interface Hiker { fig: Figure; i: number; dir: 1 | -1; phase: number; pause: number }
 /** 岛民的名字、台词类别和当前位置（给对白气泡用）。 */
 /** topic：夜市摊主守的专题（slug），气泡按它挑台词。 */
-export interface Actor { name: string; say: SayKey; root: THREE.Object3D; topic?: string }
+/** hours：这个人的作息（点到他时卡片里写几点到几点在岛上）。 */
+export interface Actor { name: string; say: SayKey; root: THREE.Object3D; topic?: string; hours?: Shift[] }
 
 const heightAt = (x: number, z: number, fallback: number = LEVEL.sand) => walkY(x, z) ?? fallback;
 
@@ -238,7 +239,7 @@ export function createResidents(mats: Materials, count = ROLES.length) {
     const made = spawn(mats, role, i, out);
     group.add(made.fig.root);
     rod = made.rod ?? rod;
-    actors.push({ name: role.name, say: role.say, root: made.fig.root });
+    actors.push({ name: role.name, say: role.say, root: made.fig.root, hours: role.hours });
     shifts.push([role.hours, made.fig.root]);
   });
   // 邮差（第一个走路的人）带土狗；角色表里写了 dog 的自己牵狗

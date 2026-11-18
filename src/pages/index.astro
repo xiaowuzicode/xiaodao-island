@@ -137,6 +137,17 @@ const canonical = new URL('/', Astro.site);
           <button type="button" data-hour="12">正午</button>
           <button type="button" data-hour="18">黄昏</button>
           <button type="button" data-hour="22">夜晚</button>
+          <div class="isl-time-scrub">
+            <label for="isl-time-range">拖一拖，看岛上的一天</label>
+            <input id="isl-time-range" type="range" min="0" max="23.99" step="0.01" value="12" />
+            <div class="isl-time-ticks" aria-hidden="true"><span>0</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
+          </div>
+          <div class="isl-time-speed" role="group" aria-label="时间流速">
+            <button type="button" data-speed="0" aria-pressed="false">暂停</button>
+            <button type="button" data-speed="1" aria-pressed="true">正常</button>
+            <button type="button" data-speed="60" aria-pressed="false">快进</button>
+            <button type="button" data-speed="1440" aria-pressed="false">一天一分钟</button>
+          </div>
         </div>
       </div>
     </header>
@@ -350,6 +361,8 @@ const canonical = new URL('/', Astro.site);
       .isl-bubble b { display: block; color: var(--isl-accent); font-size: 11.5px; margin-bottom: 1px; }
       .isl-bubble.has-link::after { content: ' →'; color: var(--isl-pick); font-weight: 700; }
       .isl-bubble.has-link:hover { background: #f3f1e4; }
+      /* 跟着看的那个人头顶的名牌：样子同对白气泡，不能点 */
+      .isl-bubble.isl-tag { pointer-events: none; border-color: var(--isl-accent); }
       @keyframes isl-pop { from { opacity: 0; } }
       .isl-label.is-boat { background: #fff4dc; border-color: rgba(214, 90, 74, 0.35); }
       .isl-label.is-boat.is-on, .isl-label.is-boat:hover { background: var(--isl-accent); color: #fff; }
@@ -377,6 +390,13 @@ const canonical = new URL('/', Astro.site);
       .isl-menu button { text-align: left; border: 0; background: transparent; color: var(--isl-ink); font: 500 13px/1 var(--isl-sans); padding: 10px 12px; border-radius: 9px; cursor: pointer; }
       .isl-menu button:hover { background: var(--isl-chip); }
       .isl-menu button[aria-pressed='true'] { background: var(--isl-pick); color: var(--isl-pick-ink); }
+      /* 时间条和流速：跟上面的时刻按钮隔一条线 */
+      .isl-time-scrub { display: grid; gap: 6px; margin-top: 6px; padding: 12px 12px 4px; border-top: 1px solid var(--isl-line); width: 228px; }
+      .isl-time-scrub label { font: 500 12px/1.2 var(--isl-sans); color: var(--isl-muted); }
+      .isl-time-scrub input { width: 100%; margin: 0; accent-color: var(--isl-accent); cursor: pointer; }
+      .isl-time-ticks { display: flex; justify-content: space-between; font: 500 10.5px/1 var(--isl-sans); color: var(--isl-muted); font-variant-numeric: tabular-nums; }
+      .isl-time-speed { display: flex; gap: 2px; padding: 4px 6px 2px; }
+      .isl-time-speed button { flex: 1 1 auto; text-align: center; padding: 9px 6px; white-space: nowrap; }
 
       .isl-views { position: fixed; top: calc(76px + env(safe-area-inset-top, 0px)); right: var(--isl-right); display: flex; gap: 2px; padding: 4px; background: var(--isl-panel); border: 1px solid var(--isl-line); border-radius: 14px; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
       .isl-views button { border: 0; background: transparent; color: var(--isl-ink); font: 500 13px/1 var(--isl-sans); padding: 9px 12px; border-radius: 10px; cursor: pointer; white-space: nowrap; }

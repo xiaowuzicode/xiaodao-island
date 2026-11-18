@@ -35,6 +35,10 @@ export interface UIHandlers {
   onPlace(id: string): void;
   onView(id: string): void;
   onTime(choice: TimeChoice): void;
+  /** 拖动时间条到几点（0–24）。只有 3D 模式有。 */
+  onScrub?(hour: number): void;
+  /** 改时间流速（岛上秒 / 真实秒）。只有 3D 模式有。 */
+  onSpeed?(speed: number): void;
   onClose(): void;
 }
 
@@ -42,6 +46,9 @@ export class UI {
   readonly card = $<HTMLElement>('isl-card');
   private readonly timeBtn = $<HTMLButtonElement>('isl-time');
   private readonly timeMenu = $<HTMLElement>('isl-time-menu');
+  private readonly timeRange = document.getElementById('isl-time-range') as HTMLInputElement | null;
+  /** 手正拖着时间条：这时不要把滑块拉回岛上的钟。 */
+  private scrubbing = false;
   private returnFocus: HTMLElement | null = null;
 
   /** signal：静态图模式下的临时 UI 用它整体解绑，进入 3D 后由正式 UI 接管。 */
@@ -64,6 +71,9 @@ export class UI {
         this.toggleTimeMenu(false);
       }, on),
     );
+    this.timeMenu.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach((b) => b.addEventListener('click', () => h.onSpeed?.(Number(b.dataset.speed)), on));
+    this.timeRange?.addEventListener('input', () => { this.scrubbing = true; h.onScrub?.(Number(this.timeRange?.value)); }, on);
+    for (const type of ['change', 'pointerup', 'blur']) this.timeRange?.addEventListener(type, () => (this.scrubbing = false), on);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !playerOpen()) { this.toggleTimeMenu(false); h.onClose(); }
     }, on);
@@ -90,11 +100,26 @@ export class UI {
     });
   }
 
-  setTime(label: string, choice: TimeChoice) {
+  setTime(label: string, choice: TimeChoice, speed = 1) {
     $('isl-time-label').textContent = label;
     this.timeMenu.querySelectorAll<HTMLButtonElement>('[data-hour]').forEach((b) =>
-      b.setAttribute('aria-pressed', String(String(choice) === b.dataset.hour)),
+      b.setAttribute('aria-pressed', String(String(choice) === b.dataset.hour && (choice !== TIME_AUTO || speed === 1))),
     );
+    this.timeMenu.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === speed)));
+  }
+
+  /** 时间条跟着岛上的钟走（手正拖着的时候不动它）。 */
+  setHour(hour: number) {
+    if (!this.timeRange || this.scrubbing) return;
+    this.timeRange.value = String(hour);
+    this.timeRange.setAttribute('aria-valuetext', `${String(Math.floor(hour)).padStart(2, '0')}:${String(Math.floor((hour % 1) * 60)).padStart(2, '0')}`);
+  }
+
+  /** 只换卡片第一段文字（跟着看一个人时，「现在在干什么」随时间变）。 */
+  setLede(text: string) {
+    const lede = $('isl-card-lede');
+    if (lede.textContent !== text) lede.textContent = text;
+    lede.hidden = !text;
   }
 
   /** 卡片挡住的区域：桌面端是右侧栏宽度；手机端是可见区域中心需要上移的像素。 */

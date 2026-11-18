@@ -88,7 +88,8 @@ function marketJobs(): Job[] {
   return out;
 }
 
-function jobs(): Job[] {
+/** 所有在岗的人（岛民的日程排位子时也要避开这些位置）。 */
+export function jobs(): Job[] {
   // 烧烤师傅站在烤炉侧面（不挡住炉子和烟），身子朝着炉子
   const grillSide = atShop('bbq', GRILL.lx - 0.75, GRILL.lz, 'out'), griller: [number, number, number] = [grillSide[0], grillSide[1], grillSide[2] + Math.PI / 2];
   // 举铁的人站在健身房门的右手边（左边是一片树）；捏陶的人站在陶艺台前、面朝它
@@ -201,7 +202,7 @@ export function createWorkers(mats: Materials, parent: THREE.Object3D, opts: { m
     const c: Crew = { job, fig, bar: job.act === 'lift' ? barbell(mats, fig) : undefined };
     if (job.act === 'grill') grillSmoke = smoke(group);
     crew.push(c);
-    actors.push({ name: job.name, say: job.say, root: fig.root, topic: job.topic });
+    actors.push({ name: job.name, say: job.say, root: fig.root, topic: job.topic, hours: job.hours });
   }
   return {
     group,

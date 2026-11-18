@@ -8,6 +8,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "check:island": "bun src/island/layout.check.ts",
+    "check:crowd": "bun src/island/crowd-plan.check.ts",
     "check:topics": "bun src/lib/topics.check.ts"
   },
   "dependencies": {

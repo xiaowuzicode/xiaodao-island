@@ -6,6 +6,9 @@ import { createScreenVideo } from '@/island/cinema-screen';
 import { createClock } from '@/island/clock';
 import { FISH_VIEW, FISH_VIEW_PORTRAIT, LAMP_LIGHTS, MOBILE_MAX_WIDTH, RENDER, VIEWS, VIEW_ALL_PORTRAIT, type View } from '@/island/config';
 import { PLACES, placeById, type IslandData } from '@/island/content';
+import { actorCard, actorTitle } from '@/island/actor-card';
+import { createCrowd } from '@/island/crowd';
+import { paceFor } from '@/island/crowd-plan';
 import { createFishing } from '@/island/fishing';
 import { Materials } from '@/island/geo';
 import { Labels, type LabelSpec } from '@/island/labels';
@@ -13,7 +16,7 @@ import { openPlayer } from '@/island/player';
 import { LIGHTHOUSE_POS } from '@/island/lighthouse';
 import { createLoop } from '@/island/loop';
 import { ocean } from '@/island/ocean';
-import { MOBILE_RESIDENTS, createResidents } from '@/island/residents';
+import { MOBILE_RESIDENTS, createResidents, type Actor } from '@/island/residents';
 import { createWorkers } from '@/island/workers';
 import { createSealife } from '@/island/sealife';
 import { createWhales } from '@/island/whales';
@@ -27,6 +30,11 @@ import { buildWorld } from '@/island/world';
 
 /** 点水面溅起的水花大小（相对海豚出水那朵）。 */
 const TAP_SPLASH = 0.45;
+/** 跟着一个人看时镜头离多远、俯仰多少；点人时离点击位置多少像素以内算点中。 */
+const PERSON_FOLLOW = { dist: 30, tilt: 0.52 } as const;
+const ACTOR_PICK_PX = 30;
+/** 「减少动态效果」下，按日程走动的人每隔这么多小时（5 分钟）挪一次位置，不在路上走。 */
+const REDUCED_STEP_HOURS = 1 / 12, REDUCED_PACE = 1e6;
 /** 船上路牌离水面的高度（米）。 */
 const BOAT_LABEL_LIFT = { ship: 5.8, mail: 4.2 } as const;
 
@@ -82,11 +90,12 @@ function buildScene(mobile: boolean) {
   const sealife = createSealife(mats, splashes);
   const whales = createWhales(mats, splashes);
   const workers = createWorkers(mats, world.root, { mobile });
+  const crowd = createCrowd(mats, { mobile });
   sea.track([...boats.floaters, ...sealife.floaters, ...whales.floaters]);
-  scene.add(sky.group, sky.clouds, sky.hemi, sky.sun, sky.sun.target, sea.mesh, boats.group, residents.group, workers.group, sealife.group, whales.group, splashes.group);
+  scene.add(sky.group, sky.clouds, sky.hemi, sky.sun, sky.sun.target, sea.mesh, boats.group, residents.group, workers.group, crowd.group, sealife.group, whales.group, splashes.group);
   // 会动的东西不投实时阴影（阴影贴图是静态的）
   for (const g of [boats.group, residents.group, workers.group, sealife.group, whales.group, splashes.group, sky.clouds]) g.traverse((o) => (o.castShadow = false));
-  return { scene, mats, sky, sea, boats, residents, workers, sealife, whales, splashes, ...world };
+  return { scene, mats, sky, sea, boats, residents, workers, crowd, sealife, whales, splashes, ...world };
 }
 
 export function start() {
@@ -107,15 +116,83 @@ export function start() {
   // 控件之间互相引用：先建循环拿到 wake，再建 UI、选中、路牌、时钟
   let size = { w: 1, h: 1 };
   const beamTarget = beamTargetAngle();
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /** 走路速度跟着时间流速定；暂停时沿用暂停前的，免得走在半路的人突然跳到终点。 */
+  let pace = paceFor(1);
+  /** 正在跟着看的人：crowd 里的编号，或者岛上原有的某个人。 */
+  let watching: { crowd: number } | { actor: Actor } | null = null;
+  const actors = [...s.residents.actors, ...s.workers.actors];
+  const tag = document.createElement('div');
+  tag.className = 'isl-bubble isl-tag';
+  tag.hidden = true;
+  const tagName = document.createElement('b'), tagText = document.createTextNode('');
+  tag.append(tagName, tagText);
+  const followPos = new THREE.Vector3();
+  const watchedHead = () => {
+    if (!watching) return null;
+    if ('crowd' in watching) return followPos.copy(s.crowd.headOf(watching.crowd));
+    return followPos.copy(watching.actor.root.position).setY(watching.actor.root.position.y + 1.75);
+  };
+  const stopWatching = () => { watching = null; s.crowd.follow(null); tag.hidden = true; };
+  function watch(next: NonNullable<typeof watching>) {
+    fishing?.setActive(false);
+    const card = 'crowd' in next ? s.crowd.card(next.crowd) : actorCard(next.actor);
+    // 先开卡片（会结束上一个人的跟拍），再记下这一个
+    selection.selectPerson(card, watchedHead, PERSON_FOLLOW, stopWatching);
+    watching = next;
+    s.crowd.follow('crowd' in next ? next.crowd : null);
+    tagName.textContent = 'crowd' in next ? s.crowd.person(next.crowd).name : next.actor.name;
+    updateWatching();
+  }
+  /** 跟着看的人：卡片第一行和头顶名牌随时间更新。 */
+  function updateWatching() {
+    if (!watching) return;
+    if ('crowd' in watching) {
+      const st = s.crowd.stateOf(watching.crowd);
+      ui.setLede(s.crowd.nowLine(watching.crowd, clock.hour));
+      tagText.data = st.doing;
+      tag.hidden = st.mode === 'hidden';
+    } else {
+      tagText.data = actorTitle(watching.actor);
+      tag.hidden = !watching.actor.root.visible;
+    }
+    const p = watchedHead();
+    if (tag.hidden || !p) return;
+    p.project(camera);
+    tag.style.transform = `translate3d(${Math.round((p.x * 0.5 + 0.5) * size.w)}px, ${Math.round((-p.y * 0.5 + 0.5) * size.h)}px, 0) translate(-50%, -100%)`;
+  }
+  /** 点在画布上离哪个人最近（先看按日程走动的人，再看岛上原有的人）；后面有东西挡着的不算。 */
+  const probe = new THREE.Vector3();
+  const personAt = (x: number, y: number): NonNullable<typeof watching> | null => {
+    const r = stage.getBoundingClientRect(), px = x - r.left, py = y - r.top;
+    const hit = selection.pick(camera, x, y), blockedAt = hit && !hit.water ? camera.position.distanceTo(hit.p) : Infinity;
+    const k = s.crowd.pick(camera, px, py, r.width, r.height, blockedAt);
+    if (k !== null) return { crowd: k };
+    let best: Actor | null = null, bestD: number = ACTOR_PICK_PX;
+    for (const a of actors) {
+      if (!a.root.visible) continue;
+      probe.copy(a.root.position).setY(a.root.position.y + 0.85);
+      if (camera.position.distanceTo(probe) > blockedAt + 2) continue;
+      probe.project(camera);
+      if (probe.z > 1) continue;
+      const dpx = Math.hypot((probe.x * 0.5 + 0.5) * r.width - px, (-probe.y * 0.5 + 0.5) * r.height - py);
+      if (dpx < bestD) { bestD = dpx; best = a; }
+    }
+    return best ? { actor: best } : null;
+  };
   const loop = createLoop({
     renderer, sun: s.sky.sun, moving: () => rig.moving,
     step: (t, dt, realDt) => {
+      clock.tick(realDt);
+      if (clock.speed > 0) pace = paceFor(clock.speed);
       rig.update(realDt);
       s.sky.update(dt, camera);
       s.sea.update(t, clock.night, s.sky.sun.position);
       s.boats.update(t, dt);
       s.residents.update(t, dt, clock.hour);
       s.workers.update(t, clock.hour);
+      if (reduced) s.crowd.update(Math.floor(clock.hour / REDUCED_STEP_HOURS) * REDUCED_STEP_HOURS, REDUCED_PACE, t, realDt, camera);
+      else s.crowd.update(clock.hour, pace, t, realDt, camera);
       s.sealife.update(t);
       s.whales.update(t);
       s.splashes.update(t);
@@ -127,12 +204,15 @@ export function start() {
       renderer.render(s.scene, camera);
       labels.update(camera, size.w, size.h);
       bubbles.update(performance.now() / 1000, camera, size.w, size.h);
+      updateWatching();
     },
   });
   const ui = new UI({
     onPlace: (id) => selection.select(id),
     onView: (id) => { fishing?.setActive(false); selection.deselect(); rig.go(viewFor(id)); ui.markView(id); loop.wake(); },
     onTime: (c) => { clock.set(c); loop.wake(); },
+    onScrub: (h) => { clock.scrub(h); loop.wake(); },
+    onSpeed: (v) => { clock.setSpeed(v); loop.wake(); },
     onClose: () => { selection.deselect(); ui.close(); },
   });
   const specs = labelSpecs(s.boats);
@@ -146,7 +226,8 @@ export function start() {
     onSelect: (id) => { if (id === 'cinema') screenVideo.start(); },
   });
   const labels = new Labels(labelHost, specs, (id) => selection.select(id));
-  const bubbles = createBubbles(labelHost, [...s.residents.actors, ...s.workers.actors], data);
+  const bubbles = createBubbles(labelHost, actors, data);
+  labelHost.appendChild(tag); // 路牌建好之后再挂（路牌初始化会清空这个容器）
   const clock = createClock({ sky: s.sky, renderer, scene: s.scene, mats: s.mats, lampLights: s.lampLights, screen: s.screen, ui });
   document.fonts?.ready.then(() => labels.measure()).catch((e) => console.warn('[island] 字体加载状态未知，路牌按当前尺寸排布', e));
   // 码头钓鱼：借周伯的竿（角色表里没有他就不开这个玩法）
@@ -170,7 +251,12 @@ export function start() {
     });
   } else fishBtn?.remove();
   // 钓鱼时点击只看岛（码头、鱼桶）和海面：船开过鱼塘时，点船身就当甩到船后面的海里
-  rig.onTap = (x, y) => (fishing?.active ? fishing.tap(selection.pick(camera, x, y, [s.root])) : selection.tap(specs, camera, x, y));
+  rig.onTap = (x, y) => {
+    if (fishing?.active) return fishing.tap(selection.pick(camera, x, y, [s.root]));
+    const who = personAt(x, y);
+    if (who) watch(who);
+    else selection.tap(specs, camera, x, y);
+  };
   rig.onUserInput = loop.wake;
 
   new ResizeObserver(() => {
@@ -194,7 +280,7 @@ export function start() {
   requestAnimationFrame(() => requestAnimationFrame(() => { if (root.dataset.island !== 'lost') root.dataset.island = 'ready'; }));
 
   if (location.search.includes('island-debug')) {
-    Object.assign(window, { __island: { setHour: (h: number) => clock.set(h), go: (id: string) => rig.go(viewFor(id), { instant: true }), select: selection.select, snap: () => rig.snap(), view: (v: View) => rig.go(v, { instant: true }), info: () => ({ ...renderer.info.render }), swimmers: () => s.sea.swimmers(), pond: () => fishing?.pond(), fishSpawn: (id: string, x?: number, z?: number) => fishing?.debugSpawn(id, x, z), fishState: () => fishing?.state,
+    Object.assign(window, { __island: { setHour: (h: number) => clock.set(h), go: (id: string) => rig.go(viewFor(id), { instant: true }), select: selection.select, snap: () => rig.snap(), view: (v: View) => rig.go(v, { instant: true }), info: () => ({ ...renderer.info.render }), speed: (v: number) => clock.setSpeed(v), scrub: (h: number) => clock.scrub(h), crowd: () => ({ outdoors: s.crowd.outdoors, hour: clock.hour }), watch: (i: number) => watch({ crowd: i }), watchActor: (n: string) => { const a = actors.find((x) => x.name === n); if (a) watch({ actor: a }); }, swimmers: () => s.sea.swimmers(), pond: () => fishing?.pond(), fishSpawn: (id: string, x?: number, z?: number) => fishing?.debugSpawn(id, x, z), fishState: () => fishing?.state,
       cam: () => camera.position.toArray(), tapSea: (x: number, z: number) => { s.sea.tap(x, z); s.splashes.trigger(x, z, TAP_SPLASH, s.sea.time()); }, actor: (n: string) => [...s.residents.actors, ...s.workers.actors].find((a) => a.name === n)?.root.position.toArray(), toScreen: (x: number, y: number, z: number) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x * 0.5 + 0.5) * size.w, (-v.y * 0.5 + 0.5) * size.h]; } } });
   }
 }

@@ -24,8 +24,12 @@ export interface Figure {
   /** phase 是步伐相位（弧度），amount 0–1 表示走路幅度（0 为站定）。 */
   pose(phase: number, amount: number): void;
   sit(): void;
+  /** 坐着的人站起来（按日程走动的人要反复坐下、起身）。 */
+  stand(): void;
   /** 直接摆两只胳膊（绕肩前后转的弧度，负值往前抬，-π 举过头顶）：干活的动作用。 */
   arms(left: number, right: number): void;
+  /** 各关节（要自己摆姿势时用，比如按日程干活的人起伏身体）。 */
+  parts: { body: THREE.Group; head: THREE.Group; legs: THREE.Group[]; arms: THREE.Group[] };
 }
 
 function limb(mats: Materials, parent: THREE.Object3D, color: string, x: number, y: number, len: number, r: number) {
@@ -142,6 +146,7 @@ export function makeFigure(mats: Materials, look: Look): Figure {
   let seated = false;
   return {
     root,
+    parts: { body, head, legs, arms },
     pose(phase, amount) {
       if (seated) return;
       const swing = Math.sin(phase) * 0.55 * amount;
@@ -156,7 +161,15 @@ export function makeFigure(mats: Materials, look: Look): Figure {
       arms[0].rotation.x = left;
       arms[1].rotation.x = right;
     },
+    stand() {
+      if (!seated) return;
+      seated = false;
+      legs.forEach((l) => (l.rotation.x = 0));
+      arms.forEach((a) => (a.rotation.x = 0));
+      body.position.y = 0;
+    },
     sit() {
+      if (seated) return;
       seated = true;
       legs.forEach((l) => (l.rotation.x = -Math.PI / 2));
       arms.forEach((a) => (a.rotation.x = -0.5));

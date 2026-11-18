@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import type { Boats } from '@/island/boats';
 import type { CameraRig } from '@/island/camera';
 import { SHIP_FOLLOW, TAP_FOCUS, VIEWS } from '@/island/config';
-import { placeById, type IslandData } from '@/island/content';
+import { placeById, type Card, type IslandData } from '@/island/content';
 import type { LabelSpec, Labels } from '@/island/labels';
 import type { UI } from '@/island/ui';
 
@@ -27,6 +27,9 @@ interface Deps {
 
 export function createSelection(d: Deps) {
   let selected: string | null = null;
+  /** 选中的不是地点而是一个人时：取消选中要做的收尾。 */
+  let onPersonClose: (() => void) | null = null;
+  const PERSON = '@person';
 
   function followShip() {
     d.rig.track(() => {
@@ -42,6 +45,8 @@ export function createSelection(d: Deps) {
   function select(id: string) {
     const pl = placeById(id);
     if (!pl) return;
+    onPersonClose?.();
+    onPersonClose = null;
     selected = id;
     d.ui.open(pl.card(d.data));
     d.labels().select(id);
@@ -57,8 +62,27 @@ export function createSelection(d: Deps) {
     d.wake();
   }
 
+  /** 选中一个人：开他的卡片，镜头跟着他走（follow 每帧给出他的位置）。onClose 在取消选中时调用。 */
+  function selectPerson(card: Card, follow: () => THREE.Vector3 | null, view: { dist: number; tilt: number }, onClose: () => void) {
+    onPersonClose?.();
+    onPersonClose = onClose;
+    selected = PERSON;
+    d.ui.open(card);
+    d.labels().select(null);
+    d.ui.markPlace(null);
+    d.ui.markView(null);
+    const inset = d.ui.panelInset(d.stage.clientHeight);
+    d.rig.panelPx = inset.right;
+    d.rig.panelUpPx = inset.up;
+    d.rig.track(follow, view.dist, view.tilt);
+    history.replaceState(null, '', location.pathname + location.search);
+    d.wake();
+  }
+
   function deselect() {
     if (!selected) return;
+    onPersonClose?.();
+    onPersonClose = null;
     selected = null;
     d.ui.close();
     d.labels().select(null);
@@ -129,5 +153,5 @@ export function createSelection(d: Deps) {
     d.wake();
   }
 
-  return { select, deselect, tap, pick };
+  return { select, selectPerson, deselect, tap, pick };
 }
