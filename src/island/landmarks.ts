@@ -53,6 +53,11 @@ const SHIP_WATERLINE = -0.15;
 
 /** 船坞外泊船的位置（船棚局部 x，滑道在 x=0）和船身条纹颜色；已上线的课多于这几个位置时，只泊最新的几门。 */
 const MOORED: [number, string][] = [[-2.6, P.roofRed], [2.6, P.roofBlue], [-5.8, P.roofGreen], [5.8, P.roofYellow]];
+/** 船坞外几个泊船位在世界坐标里的位置（同 shipyard() 的摆法：船棚在 (-25, 9)、转 -0.45π，泊在船棚局部 z = 8.4 处）。给滑板页的龙躲开桅杆用。 */
+export function mooredBoatSpots(): { x: number; z: number }[] {
+  const rot = -Math.PI * 0.45, c = Math.cos(rot), s = Math.sin(rot);
+  return MOORED.map(([mx]) => ({ x: -25 + mx * c + 8.4 * s, z: 9 - mx * s + 8.4 * c }));
+}
 /** 船帆小旗上的字；没写的取课程短名的第一个字。 */
 const FLAG: Record<string, string> = { pi: 'π', agent: 'A', vibe: 'V', llm: '模' };
 

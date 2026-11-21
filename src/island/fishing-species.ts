@@ -32,7 +32,7 @@ export interface Species {
   scale: number;
   cm: readonly [number, number];
   shells: number;
-  /** 咬钩后要拉扯几下才拉得上来（0 = 点一下就上来）。 */
+  /** 有多能挣：收线要多拉几秒（fishing-reel.ts；0 = 按住一会儿就上来）。会不会「冲」看稀有度。 */
   pulls: number;
   /** 钓上来怎么收场：进鱼桶，还是放生回海里。 */
   keep: boolean;

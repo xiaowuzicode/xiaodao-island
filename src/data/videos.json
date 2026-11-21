@@ -1,6 +1,51 @@
 {
   "videos": [
     {
+      "bvid": "BV1YssC6GEBa",
+      "title": "别人的网站首页放简介，我的首页住了 64 个人",
+      "date": "2026-11-18"
+    },
+    {
+      "bvid": "BV1qhsM6nERK",
+      "title": "最强去 AI 味工具？1.7 万星的 unslop 实测：我改到半夜的网站被挑出 15 条毛病",
+      "date": "2026-11-17"
+    },
+    {
+      "bvid": "BV1JKsE6EE1q",
+      "title": "我拆了大肥鱼，结果鱼本鱼跑来回嘴了：200 条评论全打分，你几分？",
+      "date": "2026-11-15"
+    },
+    {
+      "bvid": "BV1m2WC6PEq6",
+      "title": "DeepSeek 又【放大招】：会说 10 种语言了！我花不到 1 块钱搭了个语音助手",
+      "date": "2026-11-14"
+    },
+    {
+      "bvid": "BV1k8W667EaZ",
+      "title": "我用 Fable 5.2 把网站做成了游戏：滑板环岛，还能长翅膀飞上云",
+      "date": "2026-11-14"
+    },
+    {
+      "bvid": "BV1MgWo6KEpz",
+      "title": "172 万人围观 9 个 AI 造桥互坑：其实它们一局都没上场",
+      "date": "2026-11-13"
+    },
+    {
+      "bvid": "BV1HWWV6qEyv",
+      "title": "问 AI「一加一等于」，它最想接的不是「二」？10 道题看穿大模型",
+      "date": "2026-11-12"
+    },
+    {
+      "bvid": "BV1HxWV6KEwB",
+      "title": "一亿五千万次提问，就能把 Claude 偷走？大模型蒸馏 3 分钟讲透",
+      "date": "2026-11-11"
+    },
+    {
+      "bvid": "BV1GzW36UEAv",
+      "title": "1000 个 AI 干了 8 天，写出一个能开机的操作系统？Fable 5.2 到底强在哪",
+      "date": "2026-11-10"
+    },
+    {
       "bvid": "BV1hnWH6rEWm",
       "title": "评论区为什么全是大肥鱼？AI 是怎么自己上网发评论的",
       "date": "2026-11-09"
@@ -14,52 +59,6 @@
       "bvid": "BV1vo4Y64E2C",
       "title": "睡前只给 AI 留了三个字：别删库",
       "date": "2026-11-06"
-    },
-    {
-      "bvid": "BV1Tpxn6uE6H",
-      "title": "装一百个 Skill，为什么不占脑子？",
-      "date": "2026-11-06"
-    },
-    {
-      "bvid": "BV1g7xn6kEM2",
-      "title": "聊久了 AI 会变笨？看、压、清三个动作",
-      "date": "2026-11-05"
-    },
-    {
-      "bvid": "BV1Wk4G6jEXX",
-      "title": "DeepSeek 的 Super-agent 是什么？AI 从聊天框变成一直在线的同事｜3 分钟动画讲透",
-      "date": "2026-11-04",
-      "series": "pencil"
-    },
-    {
-      "bvid": "BV1U7xn6rE2k",
-      "title": "模型说要调用工具，就该直接执行吗？",
-      "date": "2026-11-04"
-    },
-    {
-      "bvid": "BV1gQ4w6hExp",
-      "title": "大模型是怎么工作的？15 集彩铅动画，跟一句话走完全程｜大模型原理课 预告",
-      "date": "2026-11-03"
-    },
-    {
-      "bvid": "BV1owxn6QE1b",
-      "title": "Agent 翻车的五种死法，你踩过几种？",
-      "date": "2026-11-03"
-    },
-    {
-      "bvid": "BV167xy6fEhE",
-      "title": "GitHub 这一年：代码量翻三倍，四成 PR 由 AI 起草｜数据图解",
-      "date": "2026-11-02"
-    },
-    {
-      "bvid": "BV1owxn6QEwm",
-      "title": "AI 写代码总返工？先让它出方案再动手",
-      "date": "2026-11-02"
-    },
-    {
-      "bvid": "BV1pexC6FETz",
-      "title": "本周 AI 四件事：榜首模型还不给你用",
-      "date": "2026-11-01"
     }
   ]
 }

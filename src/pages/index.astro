@@ -108,7 +108,7 @@ const canonical = new URL('/', Astro.site);
       {data.daily && <p><a href={data.daily.url}>小岛AI 日报第 {data.daily.issueNo} 期（{data.daily.date}）</a>，共 {data.issueCount} 期，<a href="/daily/">全部日报</a>。</p>}
       <h2>课程</h2>
       <ul>{FEATURED.map((c) => <li>{c.url ? <a href={c.url}>{c.title}</a> : c.title}（{c.status}）：{c.subtitle}</li>)}</ul>
-      <p><a href="/archive/">全部 {data.postCount} 篇文章</a> · <a href="/topics/">专题</a> · <a href="/videos/">课程与视频</a> · <a href="/about/">关于岛主</a> · <a href="/rss.xml">RSS</a></p>
+      <p><a href="/archive/">全部 {data.postCount} 篇文章</a> · <a href="/topics/">专题</a> · <a href="/videos/">课程与视频</a> · <a href="/handbook/">Claude Code 实战手册</a> · <a href="/about/">关于岛主</a> · <a href="/rss.xml">RSS</a></p>
     </main>
 
     <header class="isl-top">
@@ -120,6 +120,7 @@ const canonical = new URL('/', Astro.site);
         <a href="/videos/">视频</a>
         <a href="/archive/">文章</a>
         <a href="/daily/">日报</a>
+        <a href="/handbook/" title="免费领《Claude Code 实战手册》v2 和配置包">手册<em>免费</em></a>
         <a href="/about/">关于</a>
       </nav>
       <button id="isl-sound" class="isl-chip isl-sound" type="button" aria-pressed="false" title="打开海浪声">
@@ -152,23 +153,31 @@ const canonical = new URL('/', Astro.site);
       </div>
     </header>
 
+    <!-- 小游戏：单独一栏放在左边站名下面，不再挤在视角栏里 -->
+    <nav class="isl-games" aria-label="小游戏">
+      <span class="isl-games-title" aria-hidden="true">小游戏</span>
+      <a class="isl-game-link" href="/play/walk/" title="小游戏：替邮差送一天信"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="12" rx="2" /><path d="M4 7l8 6 8-6" /></svg>邮差</a>
+      <button type="button" id="isl-fish" class="isl-fish-btn" aria-pressed="false" title="小游戏：接过周伯的鱼竿，钓一篇旧文章"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="15" cy="4" r="1.6" /><path d="M15 5.6v7.4a4.5 4.5 0 0 1-9 0v-2.5l-2.4 2.4" /></svg>钓鱼</button>
+      <a class="isl-game-link" href="/play/skate/" title="小游戏：踩上滑板，绕小岛一圈"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13c1.5 1.6 3 2 5 2h8c2 0 3.5-.4 5-2" /><circle cx="8" cy="18" r="1.8" /><circle cx="16" cy="18" r="1.8" /></svg>滑板</a>
+      <a class="isl-game-link" href="/play/mosquito/" title="小游戏：30 秒能拍多少只蚊子？"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="10" height="10" rx="2" /><path d="M8 3v10M12 3v10M5 7h10M5 10h10M11 13l5 8" /></svg>拍蚊子</a>
+    </nav>
     <div class="isl-views" role="group" aria-label="视角">
       <button type="button" data-view="all" aria-pressed="true">全岛</button>
       <button type="button" data-view="harbor" aria-pressed="false">港湾</button>
       <button type="button" data-view="cape" aria-pressed="false">灯塔岬</button>
       <button type="button" data-view="sea" aria-pressed="false">群岛航线</button>
-      <button type="button" id="isl-fish" class="isl-fish-btn" aria-pressed="false" title="小游戏：接过周伯的鱼竿，钓一篇旧文章"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="15" cy="4" r="1.6" /><path d="M15 5.6v7.4a4.5 4.5 0 0 1-9 0v-2.5l-2.4 2.4" /></svg>钓鱼<em>小游戏</em></button>
-      <a class="isl-game-link" href="/play/mosquito/" title="小游戏：30 秒能拍多少只蚊子？"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="10" height="10" rx="2" /><path d="M8 3v10M12 3v10M5 7h10M5 10h10M11 13l5 8" /></svg>拍蚊子<em>小游戏</em></a>
+      <a class="isl-game-link isl-hb-link" href="/handbook/" title="免费领《Claude Code 实战手册》v2 和配置包"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" /><path d="M5 17a3 3 0 0 1 3-3h11" /></svg>手册<em>免费</em></a>
       <button type="button" id="isl-gear" class="isl-gear-btn" aria-expanded="false" aria-controls="isl-gear-panel" aria-label="渔具：0 贝壳" title="渔具：用贝壳升级鱼竿、买特饵、翻图鉴" hidden><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20c-4.4 0-8-3.1-8-7.5C4 8 7.6 4 12 4s8 4 8 8.5c0 4.4-3.6 7.5-8 7.5Z" /><path d="M12 20V7m0 13-4-11m4 11 4-11" /></svg><em id="isl-gear-badge" hidden></em></i><span id="isl-gear-shells">0</span></button>
     </div>
     <p id="isl-fish-hud" class="isl-fish-hud" aria-live="polite" hidden></p>
+    <div id="isl-fish-reel" class="isl-fish-reel" aria-hidden="true" hidden></div>
     <div id="isl-gear-panel" class="isl-gear-panel" data-tab="gear" hidden>
       <div class="isl-gear-tabs" role="tablist">
         <button type="button" role="tab" data-tab="gear" aria-selected="true">渔具</button>
         <button type="button" role="tab" data-tab="book" aria-selected="false">图鉴<span id="isl-book-count">0/10</span></button>
       </div>
       <section data-pane="gear">
-        <p class="isl-gear-head">用钓鱼攒的贝壳，升级周伯的鱼竿。海面上的虚线弧是鱼线能甩到的最远处（大鱼在外圈）；浮标周围的圈是鱼饵的范围，圈里的鱼会游过来；「!」外圈转完前要收竿。</p>
+        <p class="isl-gear-head">用钓鱼攒的贝壳，升级周伯的鱼竿。海面上的虚线弧是鱼线能甩到的最远处（大鱼在外圈）；浮标周围的圈是鱼饵的范围，圈里的鱼会游过来；「!」外圈转完前要按下去上钩；收线时手感越好，张力条的绿区越宽。</p>
         <ul id="isl-gear-list" class="isl-gear-list"></ul>
         <p class="isl-gear-head isl-gear-sub">特饵：装上后对路的生物来得多、从更远处就游过来。一次用一枚，有鱼咬钩才扣。</p>
         <ul id="isl-bait-list" class="isl-gear-list"></ul>
@@ -402,24 +411,46 @@ const canonical = new URL('/', Astro.site);
       .isl-views button { border: 0; background: transparent; color: var(--isl-ink); font: 500 13px/1 var(--isl-sans); padding: 9px 12px; border-radius: 10px; cursor: pointer; white-space: nowrap; }
       .isl-views button:hover { background: var(--isl-chip); }
       .isl-views button[aria-pressed='true'] { background: var(--isl-pick); color: var(--isl-pick-ink); }
-      /* 钓鱼是个小游戏，不是又一个视角：珊瑚红、鱼钩图标、「小游戏」角标，进页面后角标轻闪三下 */
-      .isl-views .isl-fish-btn { display: flex; align-items: center; gap: 5px; margin-left: 4px; color: var(--isl-accent); background: rgba(214, 90, 74, 0.1); font-weight: 600; }
-      .isl-views .isl-fish-btn:hover { background: rgba(214, 90, 74, 0.18); }
-      .isl-fish-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-      .isl-fish-btn em { font: 600 10px/1 var(--isl-sans); font-style: normal; padding: 3px 5px; border-radius: 6px; background: var(--isl-accent); color: var(--isl-pick-ink); animation: isl-fish-hey 1.6s ease 2s 3; }
-      .isl-views .isl-fish-btn[aria-pressed='true'] { background: var(--isl-accent); color: var(--isl-pick-ink); }
-      .isl-views .isl-fish-btn[aria-pressed='true'] em { background: var(--isl-pick-ink); color: var(--isl-accent); animation: none; }
-      /* 拍蚊子：另一个页面的小游戏，样子跟「钓鱼」一样；手机上视角栏放不下，只在宽屏显示 */
-      .isl-views .isl-game-link { display: flex; align-items: center; gap: 5px; margin-left: 2px; padding: 9px 12px; border-radius: 10px; font: 600 13px/1 var(--isl-sans); white-space: nowrap; color: var(--isl-accent); background: rgba(214, 90, 74, 0.1); text-decoration: none; }
-      .isl-views .isl-game-link:hover { background: rgba(214, 90, 74, 0.18); }
-      .isl-game-link svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-      .isl-game-link em { font: 600 10px/1 var(--isl-sans); font-style: normal; padding: 3px 5px; border-radius: 6px; background: var(--isl-accent); color: var(--isl-pick-ink); }
-      [data-fishing='on'] .isl-views .isl-game-link { display: none; }
+      /* 小游戏栏：左上角站名下面竖着排；珊瑚红，和视角、导航区分开。钓鱼就在这座岛上玩，另外两个是单独的页面 */
+      .isl-games { position: fixed; top: calc(76px + env(safe-area-inset-top, 0px)); left: var(--isl-left); z-index: 5; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--isl-panel); border: 1px solid var(--isl-line); border-radius: 14px; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+      .isl-games-title { align-self: flex-start; margin: 2px 4px 2px; font: 600 10px/1 var(--isl-sans); letter-spacing: 0.08em; padding: 3px 6px; border-radius: 6px; background: var(--isl-accent); color: var(--isl-pick-ink); animation: isl-fish-hey 1.6s ease 2s 3; }
+      .isl-games .isl-fish-btn, .isl-games .isl-game-link { display: flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 14px 0 11px; border: 0; border-radius: 10px; font: 600 13px/1 var(--isl-sans); white-space: nowrap; color: var(--isl-accent); background: rgba(214, 90, 74, 0.1); text-decoration: none; cursor: pointer; }
+      .isl-games .isl-fish-btn:hover, .isl-games .isl-game-link:hover, .isl-views .isl-game-link:hover { background: rgba(214, 90, 74, 0.18); }
+      .isl-fish-btn svg, .isl-game-link svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+      .isl-games .isl-fish-btn[aria-pressed='true'] { background: var(--isl-accent); color: var(--isl-pick-ink); }
+      /* 钓鱼时只留「钓鱼」自己（再点一下收竿），别的入口先收起来 */
+      [data-fishing='on'] .isl-games .isl-game-link, [data-fishing='on'] .isl-games-title { display: none; }
+      /* 3D 没跑起来时钓不了鱼，另外两个小游戏照样能进 */
+      html:not([data-island='ready']) .isl-games .isl-fish-btn { display: none; }
+      /* 手册入口：宽屏在主导航里（带「免费」角标），视角栏里这一个只给没有主导航的手机用 */
+      .isl-nav a em, .isl-game-link em { font: 600 10px/1 var(--isl-sans); font-style: normal; padding: 3px 5px; border-radius: 6px; background: var(--isl-accent); color: var(--isl-pick-ink); }
+      .isl-nav a em { margin-left: 5px; vertical-align: 1px; }
+      .isl-views .isl-hb-link { display: none; align-items: center; gap: 5px; margin-left: 2px; padding: 9px 12px; border-radius: 10px; font: 600 13px/1 var(--isl-sans); white-space: nowrap; color: var(--isl-accent); background: rgba(214, 90, 74, 0.1); text-decoration: none; }
       @keyframes isl-fish-hey { 0%, 100% { transform: none; } 30% { transform: translateY(-3px) scale(1.08); } 55% { transform: none; } }
-      @media (prefers-reduced-motion: reduce) { .isl-fish-btn em { animation: none; } }
+      @media (prefers-reduced-motion: reduce) { .isl-games-title { animation: none; } }
       .isl-fish-hud { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); margin: 0; padding: 10px 16px; max-width: calc(100vw - 2 * var(--isl-gutter)); font: 500 14px/1.4 var(--isl-sans); color: var(--isl-ink); background: var(--isl-panel); border: 1px solid var(--isl-line); border-radius: 14px; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); text-align: center; pointer-events: none; }
       .isl-fish-hud[hidden] { display: none; }
       [data-fishing='on'] .isl-labels { display: none; }
+      /* 收线张力条：在提示条的位置，提示条让到它上面。绿区里收线，指针进红区太久线会断；下面细条是收线进度 */
+      .isl-fish-reel { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); width: min(380px, calc(100vw - 2 * var(--isl-gutter))); box-sizing: border-box; padding: 10px 14px 12px; background: var(--isl-panel); border: 1px solid var(--isl-line); border-radius: 14px; box-shadow: var(--isl-shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); pointer-events: none; font: 12px/1.3 var(--isl-sans); color: var(--isl-muted); }
+      [data-reeling='on'] .isl-fish-hud { bottom: calc(160px + env(safe-area-inset-bottom, 0px)); }
+      .isl-reel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+      .isl-reel-head b { font: 600 14px/1.2 var(--isl-sans); color: var(--isl-ink); }
+      .isl-reel-track { position: relative; height: 14px; border-radius: 7px; background: var(--isl-chip); overflow: hidden; }
+      .isl-reel-track i { position: absolute; top: 0; bottom: 0; }
+      .isl-reel-safe { background: rgba(47, 93, 85, 0.24); }
+      .isl-reel-danger { right: 0; background: repeating-linear-gradient(-45deg, rgba(214, 90, 74, 0.32) 0 5px, rgba(214, 90, 74, 0.18) 5px 10px); }
+      .isl-reel-needle { width: 4px; margin-left: -2px; border-radius: 2px; background: var(--isl-pick); transition: background 0.15s; }
+      .isl-reel-progress { margin-top: 6px; height: 5px; border-radius: 3px; background: var(--isl-chip); overflow: hidden; }
+      .isl-reel-progress i { display: block; height: 100%; width: 0; background: var(--isl-pick); border-radius: 3px; }
+      .isl-fish-reel[data-state='over'] .isl-reel-needle { background: var(--isl-accent); }
+      .isl-fish-reel[data-state='over'] { animation: isl-reel-shake 0.18s linear infinite; }
+      .isl-fish-reel[data-state='surge'] .isl-reel-head b { color: var(--isl-accent); }
+      .isl-fish-reel[data-state='slack'] .isl-reel-needle { opacity: 0.45; }
+      @keyframes isl-reel-shake { 0%, 100% { transform: translateX(-50%); } 25% { transform: translateX(calc(-50% - 2px)); } 75% { transform: translateX(calc(-50% + 2px)); } }
+      @keyframes isl-pop { 0% { transform: none; } 35% { transform: translateY(-3px) scale(1.35); } 100% { transform: none; } }
+      .isl-gear-btn span.is-pop { display: inline-block; animation: isl-pop 0.5s ease; }
+      @media (prefers-reduced-motion: reduce) { .isl-fish-reel[data-state='over'], .isl-gear-btn span.is-pop { animation: none; } }
       /* 渔具按钮：挨着「钓鱼」，只占一个图标加贝壳数；钓鱼时才出现，够升级时贝壳图标右上角亮一个小红点 */
       .isl-views .isl-gear-btn { display: flex; align-items: center; gap: 4px; margin-left: 2px; padding-inline: 9px; font-variant-numeric: tabular-nums; }
       .isl-views .isl-gear-btn[hidden] { display: none; }
@@ -532,9 +563,18 @@ const canonical = new URL('/', Astro.site);
         .isl-chip { padding: 9px 12px; }
         .isl-views { top: auto; right: auto; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
         /* 手机上钓到后的卡片从底部升起，提示条放到顶部，免得「要甩到水里」之类的反馈藏在卡片后面 */
-        .isl-fish-hud { top: calc(72px + env(safe-area-inset-top, 0px)); bottom: auto; }
-        .isl-fish-btn em { display: none; }
-        .isl-views .isl-game-link { display: none; }
+        .isl-fish-hud, [data-reeling='on'] .isl-fish-hud { top: calc(124px + env(safe-area-inset-top, 0px)); bottom: auto; }
+        .isl-fish-reel { bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+        /* 手机上小游戏栏横着排在站名下面一行，占的是天空的位置，不挡岛；拍蚊子要鼠标，手机上不放 */
+        .isl-games { top: calc(72px + env(safe-area-inset-top, 0px)); flex-direction: row; align-items: center; gap: 4px; padding: 4px; }
+        .isl-games-title { align-self: center; margin: 0 2px 0 4px; }
+        .isl-games .isl-fish-btn, .isl-games .isl-game-link { min-height: 36px; padding: 0 11px 0 9px; gap: 5px; }
+        .isl-games .isl-game-link[href='/play/mosquito/'] { display: none; }
+        /* 手机没有主导航：手册入口留在视角栏里 */
+        .isl-views button, .isl-views .isl-hb-link { padding: 9px 8px; }
+        .isl-views .isl-hb-link { display: flex; }
+        .isl-views .isl-hb-link em { display: none; }
+        [data-fishing='on'] .isl-views .isl-hb-link { display: none; }
         /* 手机上视角栏放不下：钓鱼时只留「全岛」（点它退出钓鱼），腾出位置给渔具 */
         [data-fishing='on'] .isl-views [data-view]:not([data-view='all']) { display: none; }
         .isl-gear-panel { top: auto; right: var(--isl-right); bottom: calc(130px + env(safe-area-inset-bottom, 0px)); max-height: calc(100svh - 340px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
@@ -542,6 +582,15 @@ const canonical = new URL('/', Astro.site);
         .isl-dock { left: var(--isl-left); right: var(--isl-right); transform: none; }
         .isl-card { top: auto; left: var(--isl-left); right: var(--isl-right); width: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); max-height: 56%; border-radius: 20px; }
         [data-island='ready'] .isl-hint { display: none; }
+      }
+      /* 很窄的手机（≤370）上视角栏再收一点，手册入口才放得下 */
+      @media (max-width: 370px) {
+        .isl-views button, .isl-views .isl-hb-link { padding: 8px 6px; font-size: 12px; }
+        /* 这么窄时站名会折成两行，小游戏栏再往下让一点 */
+        .isl-games { top: calc(90px + env(safe-area-inset-top, 0px)); }
+        .isl-fish-hud, [data-reeling='on'] .isl-fish-hud { top: calc(142px + env(safe-area-inset-top, 0px)); }
+        /* 小游戏栏四样（标题、钓鱼、滑板、邮差）横排在 320 宽也放得下 */
+        .isl-games .isl-fish-btn, .isl-games .isl-game-link { padding: 0 8px 0 7px; gap: 4px; }
       }
       @media (prefers-reduced-motion: reduce) {
         .isl-canvas, .isl-poster img, .isl-poster::before { transition: none; }

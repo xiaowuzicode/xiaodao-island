@@ -1,0 +1,365 @@
+---
+/**
+ * 滑板环岛：岛主的男孩踩着滑板绕小岛一圈，镜头跟着，路过地点出一张小卡片。两种玩法：逛岛、挑战。
+ * 3D 和玩法在 src/island/skate/，岛本身复用首页那套；卡片上的字取自 content.ts，在这里（构建时）截好放进页面。
+ */
+import { getCollection } from 'astro:content';
+import Analytics from '@/components/Analytics.astro';
+import Logo from '@/components/Logo.astro';
+import type { IslandData } from '@/island/content';
+import { tourCards } from '@/island/skate/cards';
+import { loadIssues } from '@/lib/daily';
+
+const posts = (await getCollection('posts')).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const issues = loadIssues();
+const latest = posts[0];
+// 卡片文字只用得到篇数、期数和最新一篇（讲码头那句出自「新文章船」的卡片）
+const data: IslandData = {
+  posts: latest ? [{ title: latest.data.title, summary: latest.data.summary, date: latest.data.pubDate.toISOString().slice(0, 10), url: `/posts/${latest.id}/` }] : [],
+  postCount: posts.length, daily: null, issueCount: issues.length, archive: [], topics: [],
+};
+const cards = tourCards(data);
+const title = '滑板环岛 · 小岛AI';
+const description = '踩着滑板绕小岛一圈：灯塔、船坞、渔港夜市、岛刊社、放映台、岛主小屋，一路收金币，找齐九支彩铅。';
+const canonical = new URL('/play/skate/', Astro.site);
+---
+
+<!doctype html>
+<html lang="zh-CN" data-skate="boot">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#f6d9b0" />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <Analytics />
+  </head>
+  <body class="sk">
+    <div id="sk-stage" class="sk-stage">
+      <canvas id="sk-canvas" class="sk-canvas" tabindex="0" aria-label="滑板环岛：男孩踩着滑板绕小岛一圈。左右方向键换道，空格起跳，下方向键下蹲。"></canvas>
+    </div>
+
+    <!-- 开场：先是一张纸，岛画好了再揭开 -->
+    <div id="sk-boot" class="sk-boot" aria-hidden="true"><span class="sk-boot-mark">滑板环岛</span><span class="sk-boot-sub">正在下载小岛…</span><i class="sk-boot-bar" aria-hidden="true"><b id="sk-boot-fill"></b></i></div>
+
+    <header class="sk-top">
+      <a href="/" class="sk-brand" aria-label="回小岛首页"><Logo /><span>小岛AI</span></a>
+      <div class="sk-tools">
+        <button id="sk-menu" type="button" class="sk-btn" title="小结（Tab）" hidden>小结</button>
+        <button id="sk-cam" type="button" class="sk-btn" title="换机位（C）">机位</button>
+        <button id="sk-look" type="button" class="sk-btn sk-dot" aria-pressed="true" title="彩铅画风（P）">彩铅画风</button>
+        <span class="sk-sound">
+          <button id="sk-mute" type="button" class="sk-btn sk-dot" aria-pressed="true" title="声音（M）">声音 开</button>
+          <input id="sk-vol" type="range" min="5" max="100" step="5" value="80" aria-label="音量" />
+        </span>
+      </div>
+    </header>
+
+    <section id="sk-title" class="sk-title" aria-label="开始">
+      <p class="sk-eyebrow"><b>小岛AI</b><span>环岛一圈 · 一分多钟</span></p>
+      <h1>滑板环岛</h1>
+      <p class="sk-premise">踩上滑板，绕小岛一圈。一路收金币，九个地点各藏着一支彩铅。</p>
+      <div class="sk-modes">
+        <button id="sk-start-tour" type="button" class="sk-go"><b>逛岛</b><small>慢慢看，什么都撞不到</small></button>
+        <button id="sk-start-challenge" type="button" class="sk-go sk-alt"><b>挑战</b><small>栏架、彩旗、道具，骑完评级</small></button>
+        <button id="sk-start-free" type="button" class="sk-go sk-third"><b>自由滑</b><small>没有轨道，全岛随便滑、随便飞</small></button>
+      </div>
+      <ul class="sk-keys">
+        <li><kbd>←</kbd><kbd>→</kbd> 换道</li>
+        <li><kbd>空格</kbd> 起跳，按久跳高，空中再按翻板</li>
+        <li><kbd>↓</kbd> 下蹲</li>
+        <li><kbd>C</kbd> 换机位</li>
+        <li class="sk-touch-only">点左右半屏换道，上划起跳，下划下蹲</li>
+      </ul>
+    </section>
+
+    <div id="sk-loc" class="sk-loc" aria-hidden="true"><i></i><b id="sk-loc-name"></b><span id="sk-loc-line"></span></div>
+
+    <div id="sk-hud" class="sk-hud" aria-live="off">
+      <div class="sk-left">
+        <div class="sk-score">
+          <span class="sk-points"><b id="sk-score">0</b><small>分</small></span>
+          <span class="sk-coins"><i class="sk-coin" aria-hidden="true"></i><b id="sk-count">0</b><small>/ <span id="sk-total">0</span></small></span>
+          <em id="sk-combo" class="sk-combo">连击 ×0</em>
+        </div>
+        <div class="sk-row2"><span id="sk-pens" class="sk-pens" aria-label="找到的彩铅"></span><span id="sk-timers" class="sk-timers"></span></div>
+        <div id="sk-gate" class="sk-gate" aria-live="polite"><b id="sk-gate-name"></b><span id="sk-gate-time"></span><small id="sk-gate-best"></small></div>
+      </div>
+      <div class="sk-lap" role="progressbar" aria-label="这一圈的进度">
+        <div class="sk-bar"><span id="sk-fill"></span><div id="sk-dots"></div></div>
+        <span id="sk-clock" class="sk-clock"></span>
+      </div>
+    </div>
+
+    <div id="sk-compass" class="sk-compass" aria-hidden="true"><i id="sk-compass-arrow"></i><span id="sk-compass-text"></span></div>
+
+    <div id="sk-touch" class="sk-touch" hidden>
+      <div id="sk-stick" class="sk-stick" aria-label="方向：左右转向，往前推蹬地"><i id="sk-stick-knob"></i></div>
+      <div class="sk-pads">
+        <button id="sk-t-brake" type="button" class="sk-pad" aria-label="刹车"><b>刹</b></button>
+        <button id="sk-t-jump" type="button" class="sk-pad sk-pad-big" aria-label="跳"><b>跳</b></button>
+      </div>
+    </div>
+
+    <aside id="sk-card" class="sk-card" aria-live="polite">
+      <small id="sk-card-tag"></small>
+      <b id="sk-card-name"></b>
+      <span id="sk-card-line"></span>
+    </aside>
+
+    <section id="sk-end" class="sk-end" aria-label="这一圈骑完了">
+      <div class="sk-end-head">
+        <p class="sk-eyebrow"><b id="sk-end-title">到码头了</b><span id="sk-end-sub">环岛一圈</span></p>
+        <strong id="sk-end-grade" class="sk-grade"></strong>
+      </div>
+      <dl>
+        <div class="sk-points"><dt>得分</dt><dd id="sk-end-score">0</dd></div>
+        <div class="sk-points"><dt>最好成绩</dt><dd id="sk-end-best">0</dd></div>
+        <div><dt>金币</dt><dd id="sk-end-count">0</dd></div>
+        <div><dt>用时</dt><dd id="sk-end-time">0</dd></div>
+        <div class="sk-only-lap"><dt>最高连击</dt><dd id="sk-end-combo">×0</dd></div>
+        <div><dt>彩铅</dt><dd id="sk-end-pens-n">0</dd></div>
+        <div class="sk-only-challenge"><dt>龙环</dt><dd id="sk-end-drings">0</dd></div>
+      </dl>
+      <p id="sk-end-pens" class="sk-pens sk-pens-big" aria-label="九支彩铅找到了哪些"></p>
+      <ul id="sk-end-gates" class="sk-end-gates" hidden></ul>
+      <button id="sk-again" type="button" class="sk-go"><b>再来一圈</b></button>
+      <p class="sk-links"><button id="sk-other" type="button" class="sk-link">换一种玩法</button><a href="/archive/">看最新文章</a><a href="/">回小岛</a></p>
+    </section>
+
+    <aside id="sk-tune" class="sk-tune" hidden>
+      <div id="sk-tune-body"></div>
+      <button id="sk-tune-copy" type="button" class="sk-btn">复制成 JSON</button>
+      <textarea id="sk-tune-json" rows="3" readonly aria-label="手感参数 JSON"></textarea>
+    </aside>
+
+    <noscript><p class="sk-noscript">这个小游戏需要 JavaScript。<a href="/">回小岛</a></p></noscript>
+    <script type="application/json" id="sk-data" set:html={JSON.stringify(cards)} />
+
+    <script>
+      const root = document.documentElement;
+      const fail = (e: unknown) => {
+        console.error('[skate] 没能启动', e);
+        root.dataset.skate = 'failed';
+        const sub = document.querySelector('.sk-boot-sub');
+        if (sub) {
+          sub.innerHTML = '这台设备没能打开 3D。<a href="/">回小岛</a>';
+          // 把出错原因也写出来：光说"没能打开"，访客没法反馈，我们也没法查
+          const why = document.createElement('small');
+          why.style.cssText = 'display:block;margin-top:12px;font-size:12px;letter-spacing:0;opacity:.7;max-width:80vw;word-break:break-all';
+          const err = e instanceof Error ? e : new Error(String(e));
+          why.textContent = `原因：${err.name}: ${err.message}`.slice(0, 300);
+          sub.appendChild(why);
+        }
+      };
+      import('@/island/skate/main').then((m) => m.start()).catch(fail);
+    </script>
+
+    <style is:global>
+      :root {
+        --sk-paper: #fcf8ee; --sk-panel: rgba(252, 248, 238, 0.93); --sk-ink: #23413b; --sk-muted: #62776f; --sk-line: rgba(35, 65, 59, 0.14);
+        --sk-pick: #2f5d55; --sk-accent: #d65a4a; --sk-gold: #e9b350; --sk-shadow: 0 8px 28px rgba(30, 64, 58, 0.16);
+        --sk-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+        --sk-serif: 'Songti SC', 'Noto Serif SC', 'Source Han Serif SC', STSong, serif;
+        --sk-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+        --sk-l: max(16px, env(safe-area-inset-left, 0px)); --sk-r: max(16px, env(safe-area-inset-right, 0px));
+        --sk-t: max(12px, env(safe-area-inset-top, 0px)); --sk-b: max(16px, env(safe-area-inset-bottom, 0px));
+        color-scheme: light;
+      }
+      [hidden] { display: none !important; }
+      html, body.sk { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+      body.sk { background: var(--sk-paper); color: var(--sk-ink); font: 14px/1.5 var(--sk-sans); -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+      .sk *, .sk *::before, .sk *::after { box-sizing: border-box; }
+      .sk a { color: inherit; }
+      .sk :focus-visible { outline: 2px solid var(--sk-accent); outline-offset: 2px; }
+      .sk-stage { position: fixed; inset: 0; }
+      .sk-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+      /* 开场的那张纸 */
+      .sk-boot { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: var(--sk-paper); transition: opacity 0.9s ease; }
+      .sk-boot-mark { font: 800 clamp(34px, 8vw, 72px)/1 var(--sk-serif); letter-spacing: 0.14em; margin-right: -0.14em; }
+      .sk-boot-sub { font-size: 13px; letter-spacing: 0.2em; color: var(--sk-muted); }
+      /* 开场进度：下载时先走到一成，之后每搭好一步往前走一截 */
+      .sk-boot-bar { display: block; width: min(220px, 60vw); height: 3px; border-radius: 2px; background: var(--sk-line); overflow: hidden; }
+      .sk-boot-bar b { display: block; height: 100%; background: var(--sk-accent); transform-origin: left center; transform: scaleX(var(--k, 0.1)); transition: transform 0.35s ease; }
+      /* 还在下载脚本的时候（网慢要好几秒）：慢慢往前爬到两成，不让进度条看着像卡住了；脚本跑起来以后按真实的步骤走 */
+      @keyframes sk-boot-creep { from { transform: scaleX(0.03); } to { transform: scaleX(0.22); } }
+      .sk-boot-bar b:not(.go) { animation: sk-boot-creep 9s cubic-bezier(0.2, 0.6, 0.3, 1) both; }
+      [data-skate='failed'] .sk-boot-bar { display: none; }
+      [data-skate='ready'] .sk-boot { opacity: 0; pointer-events: none; }
+
+      .sk-top { position: fixed; z-index: 12; top: var(--sk-t); left: var(--sk-l); right: var(--sk-r); display: flex; align-items: center; justify-content: space-between; gap: 12px; pointer-events: none; }
+      .sk-top > * { pointer-events: auto; }
+      .sk-brand { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 999px; background: var(--sk-panel); box-shadow: var(--sk-shadow); text-decoration: none; font-weight: 700; white-space: nowrap; }
+      .sk-brand img { display: block; }
+      .sk-tools { display: flex; align-items: center; gap: 8px; }
+      .sk-btn { min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--sk-panel); color: var(--sk-ink); box-shadow: var(--sk-shadow); font: 600 13px/1 var(--sk-sans); cursor: pointer; white-space: nowrap; }
+      .sk-dot[aria-pressed='false'] { color: var(--sk-muted); }
+      .sk-dot[aria-pressed='true']::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--sk-accent); vertical-align: 1px; }
+      .sk-btn:disabled { opacity: 0.5; cursor: default; }
+      .sk-sound { display: flex; align-items: center; gap: 0; border-radius: 999px; background: var(--sk-panel); box-shadow: var(--sk-shadow); }
+      .sk-sound .sk-btn { background: none; box-shadow: none; }
+      .sk-sound input { width: 72px; margin: 0 12px 0 0; accent-color: var(--sk-pick); }
+
+      /* 片头 */
+      .sk-title, .sk-end { position: fixed; z-index: 10; left: max(var(--sk-l), 5.5vw); bottom: calc(var(--sk-b) + clamp(20px, 8vh, 88px)); max-width: min(680px, calc(100vw - var(--sk-l) - var(--sk-r)));
+        opacity: 0; transform: translateY(14px); transition: opacity 0.7s ease, transform 0.7s ease; pointer-events: none; }
+      .sk-title { text-shadow: 0 1px 14px rgba(252, 248, 238, 0.85), 0 0 3px rgba(252, 248, 238, 0.9); }
+      .sk-title.on, .sk-end.on { opacity: 1; transform: none; pointer-events: auto; }
+      /* 片头字后面垫一层从左往右淡出的纸色，画面再花字也读得清 */
+      .sk-title::before { content: ''; position: fixed; z-index: -1; inset: 0; background: linear-gradient(90deg, rgba(252, 248, 238, 0.88) 0%, rgba(252, 248, 238, 0.62) 34%, rgba(252, 248, 238, 0) 66%); pointer-events: none; }
+      .sk-eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0; font-size: 13px; letter-spacing: 0.18em; color: var(--sk-ink); }
+      .sk-eyebrow b { padding: 3px 9px; border-radius: 6px; background: var(--sk-accent); color: var(--sk-paper); letter-spacing: 0.1em; text-shadow: none; }
+      .sk-title h1 { margin: 10px 0 12px; font: 900 clamp(52px, 10.5vw, 128px)/0.95 var(--sk-serif); letter-spacing: 0.1em; color: var(--sk-ink); white-space: nowrap; }
+      .sk-premise { position: relative; margin: 0; padding-top: 14px; border-top: 1px solid rgba(35, 65, 59, 0.35); font-size: clamp(15px, 1.5vw, 18px); line-height: 1.6; max-width: 30em; }
+      .sk-premise::before { content: ''; position: absolute; left: 0; top: -2px; width: 64px; height: 3px; background: var(--sk-accent); }
+      .sk-modes { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+      .sk-go { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; min-height: 60px; padding: 10px 26px; border: 0; border-radius: 18px; background: var(--sk-pick); color: var(--sk-paper); box-shadow: var(--sk-shadow); font-family: var(--sk-sans); cursor: pointer; text-shadow: none; text-align: left; transition: transform 0.15s ease, filter 0.15s ease; }
+      .sk-go b { font-size: 19px; line-height: 1; letter-spacing: 0.24em; }
+      .sk-go small { font-size: 12px; opacity: 0.85; letter-spacing: 0.04em; }
+      .sk-go.sk-alt { background: var(--sk-accent); }
+      .sk-go.sk-third { background: var(--sk-paper); color: var(--sk-ink); box-shadow: var(--sk-shadow), inset 0 0 0 2px var(--sk-pick); }
+      [data-sk-mode='free'] .sk-points, [data-sk-mode='free'] .sk-lap, [data-sk-mode='free'] .sk-combo, [data-sk-mode='free'] .sk-end .sk-only-lap, [data-sk-mode='free'] #sk-cam { display: none; }
+      /* 自由滑：计时小段的牌子、指向最近一支彩铅的箭头、触屏的摇杆和两个按钮、小结里的各段最好成绩 */
+      .sk-gate { display: flex; align-items: baseline; gap: 8px; margin-top: 8px; padding: 6px 12px; border-radius: 12px; background: var(--sk-panel); box-shadow: var(--sk-shadow); font: 600 12px/1.3 var(--sk-sans); width: max-content; max-width: 70vw; opacity: 0; transform: translateY(-4px); transition: opacity 0.3s, transform 0.3s; }
+      .sk-gate.on { opacity: 1; transform: none; }
+      .sk-gate span { font: 700 18px/1 var(--sk-sans); font-variant-numeric: tabular-nums; color: var(--sk-pick); }
+      .sk-gate small { opacity: 0.65; }
+      .sk-compass { position: fixed; z-index: 9; top: calc(var(--sk-t) + 52px); left: 50%; transform: translate(-50%, -6px); display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 999px; background: var(--sk-panel); box-shadow: var(--sk-shadow); font: 600 12px/1 var(--sk-sans); opacity: 0; transition: opacity 0.4s, transform 0.4s; pointer-events: none; }
+      .sk-compass.on { opacity: 1; transform: translate(-50%, 0); }
+      .sk-compass i { width: 22px; height: 22px; border-radius: 50%; background: var(--c, var(--sk-pick)); position: relative; transform: rotate(var(--a, 0deg)); }
+      .sk-compass i::after { content: ''; position: absolute; left: 50%; top: 3px; width: 0; height: 0; margin-left: -5px; border: 5px solid transparent; border-bottom: 10px solid var(--sk-paper); border-top: 0; }
+      .sk-touch { position: fixed; z-index: 9; inset: auto var(--sk-r) calc(var(--sk-b) + 14px) var(--sk-l); display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none; opacity: 0; transition: opacity 0.4s; }
+      .sk-touch.on { opacity: 1; }
+      .sk-stick { width: 132px; height: 132px; border-radius: 50%; background: color-mix(in srgb, var(--sk-panel) 62%, transparent); box-shadow: var(--sk-shadow); position: relative; pointer-events: auto; touch-action: none; }
+      .sk-stick i { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px; border-radius: 50%; background: var(--sk-pick); transform: translate(var(--x, 0px), var(--y, 0px)); transition: transform 0.08s; }
+      .sk-pads { display: flex; align-items: flex-end; gap: 12px; pointer-events: auto; }
+      .sk-pad { width: 64px; height: 64px; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--sk-panel) 80%, transparent); color: var(--sk-ink); box-shadow: var(--sk-shadow); font: 700 18px/1 var(--sk-sans); touch-action: none; -webkit-user-select: none; user-select: none; }
+      .sk-pad-big { width: 84px; height: 84px; background: var(--sk-pick); color: var(--sk-paper); font-size: 22px; }
+      .sk-pad:active { transform: scale(0.94); }
+      .sk-end-gates { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; font: 500 13px/1.4 var(--sk-sans); }
+      .sk-end-gates li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 10px; background: color-mix(in srgb, var(--sk-ink) 6%, transparent); }
+      .sk-end-gates b { font-variant-numeric: tabular-nums; }
+      /* 道具小牌子消失时也淡出去（脚本先加 .out，动画完了才真的藏起来） */
+      @keyframes sk-chip-out { to { opacity: 0; transform: translateY(-4px) scale(0.86); } }
+      .sk-timers span.out { animation: sk-chip-out 0.26s ease-in both; }
+      .sk-go:hover { filter: brightness(0.92); transform: translateY(-1px); }
+      .sk-go:active { transform: translateY(1px); }
+      .sk-keys { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 18px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--sk-ink); }
+      .sk-keys kbd { display: inline-block; min-width: 24px; margin-right: 4px; padding: 2px 6px; border-radius: 6px; background: var(--sk-panel); box-shadow: 0 1px 0 rgba(35, 65, 59, 0.3); font: 600 12px/1.4 var(--sk-mono); text-align: center; text-shadow: none; }
+      .sk-touch-only { display: none; }
+      @media (pointer: coarse) { .sk-touch-only { display: block; } .sk-keys li:not(.sk-touch-only) { display: none; } }
+
+      /* 出发时的地点卡 */
+      .sk-loc { position: fixed; z-index: 9; left: max(var(--sk-l), 5.5vw); bottom: calc(var(--sk-b) + 24vh); max-width: calc(100vw - var(--sk-l) - var(--sk-r) - 24px); padding-left: 16px; opacity: 0; transition: opacity 0.6s ease; pointer-events: none; text-shadow: 0 1px 12px rgba(252, 248, 238, 0.9), 0 0 3px rgba(252, 248, 238, 0.9); }
+      .sk-loc i { position: absolute; left: 0; top: 3px; bottom: 3px; width: 3px; background: var(--sk-accent); }
+      .sk-loc b { display: block; font: 800 clamp(22px, 3.2vw, 36px)/1.1 var(--sk-serif); letter-spacing: 0.16em; }
+      .sk-loc span { display: block; margin-top: 6px; font-size: 13px; letter-spacing: 0.08em; }
+      @keyframes sk-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 -4% 0 0); } }
+      .sk-loc.on { opacity: 1; }
+      .sk-loc.on b { animation: sk-wipe 1s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+      /* 计分条 */
+      .sk-hud { position: fixed; z-index: 8; left: var(--sk-l); right: var(--sk-r); top: calc(var(--sk-t) + 52px); display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; opacity: 0; transform: translateY(-8px); transition: opacity 0.6s ease, transform 0.6s ease; pointer-events: none; }
+      .sk-hud.on { opacity: 1; transform: none; }
+      .sk-left { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+      .sk-score { display: flex; align-items: baseline; gap: 14px; padding: 8px 14px; border-radius: 14px; background: var(--sk-panel); box-shadow: var(--sk-shadow); white-space: nowrap; }
+      .sk-score b { font: 700 22px/1 var(--sk-mono); font-variant-numeric: tabular-nums; }
+      .sk-score small { margin-left: 4px; font-size: 12px; color: var(--sk-muted); }
+      .sk-coins { display: inline-flex; align-items: baseline; }
+      .sk-coin { align-self: center; width: 14px; height: 14px; margin-right: 6px; border-radius: 50%; background: var(--sk-gold); box-shadow: inset 0 0 0 2px #fff3c4, 0 0 0 1px #b8791a; }
+      [data-sk-mode='tour'] .sk-points { display: none; }
+      .sk-combo { padding: 3px 8px; border-radius: 999px; background: var(--sk-gold); color: #4a3410; font: 700 12px/1.3 var(--sk-sans); font-style: normal; opacity: 0; transform: scale(0.8); transition: opacity 0.2s ease, transform 0.2s ease; }
+      .sk-combo.on { opacity: 1; transform: none; }
+      .sk-row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+      /* 九支彩铅：找到的上色，没找到的只有一圈 */
+      .sk-pens { display: inline-flex; align-items: flex-end; gap: 5px; padding: 6px 11px; border-radius: 999px; background: var(--sk-panel); box-shadow: var(--sk-shadow); }
+      /* 没找到的：一支灰色虚线勾的空笔；找到的：实心上色、长一截、带深色描边——在手机上也一眼分得清 */
+      .sk-pens i { width: 11px; height: 17px; border-radius: 2px 2px 6px 6px; border: 1.5px dashed rgba(35, 65, 59, 0.38); background: transparent; }
+      .sk-pens i.on { height: 22px; border: 1.5px solid rgba(35, 65, 59, 0.75); background: var(--c); box-shadow: 0 1px 0 rgba(35, 65, 59, 0.25); }
+      .sk-pens-big { display: flex; justify-content: center; gap: 9px; margin: 14px 0 0; padding: 10px; box-shadow: none; background: rgba(35, 65, 59, 0.06); }
+      .sk-pens-big { align-items: flex-end; }
+      .sk-pens-big i { width: 14px; height: 24px; } .sk-pens-big i.on { height: 32px; }
+      .sk-timers { display: inline-flex; gap: 6px; }
+      /* 道具的小牌子出现时缩放着淡进来，不是啪地冒出来 */
+      @keyframes sk-chip-in { from { opacity: 0; transform: translateY(4px) scale(0.86); } to { opacity: 1; transform: none; } }
+      .sk-timers span:not([hidden]) { animation: sk-chip-in 0.24s ease-out both; }
+      .sk-timers span { position: relative; padding: 4px 10px 7px; border-radius: 10px; background: var(--sk-panel); box-shadow: var(--sk-shadow); font: 700 12px/1.2 var(--sk-sans); overflow: hidden; }
+      .sk-timers b { position: absolute; left: 0; bottom: 0; height: 3px; width: 100%; background: var(--sk-accent); transform-origin: left center; transform: scaleX(var(--k)); }
+      .sk-timers .star b { background: var(--sk-gold); } .sk-timers .boost b { background: var(--sk-pick); }
+      .sk-timers .shield { padding-bottom: 4px; box-shadow: var(--sk-shadow), inset 0 0 0 2px var(--sk-accent); }
+      .sk-lap { flex: 0 1 380px; display: flex; align-items: center; gap: 10px; min-width: 120px; padding: 8px 14px; border-radius: 14px; background: var(--sk-panel); box-shadow: var(--sk-shadow); }
+      .sk-bar { position: relative; flex: 1 1 auto; height: 6px; border-radius: 3px; background: var(--sk-line); }
+      .sk-bar > span { position: absolute; inset: 0; border-radius: 3px; background: var(--sk-pick); transform-origin: left center; transform: scaleX(0); }
+      .sk-bar i { position: absolute; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--sk-paper); border: 2px solid var(--sk-accent); }
+      .sk-clock { font: 600 12px/1 var(--sk-mono); color: var(--sk-muted); font-variant-numeric: tabular-nums; }
+
+      /* 路过地点的小卡片：放在右上、进度条下面——男孩在画面下半边，卡片不会挡到他 */
+      .sk-card { position: fixed; z-index: 9; right: var(--sk-r); top: calc(var(--sk-t) + 104px); max-width: min(360px, calc(100vw - var(--sk-l) - var(--sk-r))); padding: 12px 16px 13px 18px; border-radius: 16px; background: var(--sk-panel); box-shadow: var(--sk-shadow);
+        opacity: 0; transform: translateY(-10px); transition: opacity 0.45s ease, transform 0.45s ease; pointer-events: none; }
+      .sk-card::before { content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 0 4px 4px 0; background: var(--sk-accent); }
+      .sk-card.on { opacity: 1; transform: none; }
+      .sk-card small { display: block; font-size: 11px; letter-spacing: 0.18em; color: var(--sk-muted); }
+      .sk-card b { display: block; font: 800 22px/1.25 var(--sk-serif); letter-spacing: 0.08em; }
+      .sk-card span { display: block; margin-top: 2px; font-size: 13.5px; line-height: 1.55; color: var(--sk-ink); }
+
+      /* 终点 */
+      .sk-end { padding: 22px 24px 20px; border-radius: 22px; background: var(--sk-panel); box-shadow: var(--sk-shadow); width: min(440px, calc(100vw - var(--sk-l) - var(--sk-r))); }
+      .sk-end-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .sk-grade { font: 900 64px/0.9 var(--sk-serif); color: var(--sk-accent); }
+      .sk-grade:empty { display: none; }
+      .sk-end dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 10px; margin: 16px 0 0; }
+      .sk-end dt { font-size: 12px; letter-spacing: 0.12em; color: var(--sk-muted); }
+      .sk-end dd { margin: 2px 0 0; font: 700 19px/1.2 var(--sk-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+      [data-sk-mode='tour'] .sk-end dl { grid-template-columns: repeat(2, 1fr); }
+      [data-sk-mode='tour'] .sk-end .sk-only-challenge, [data-sk-mode='free'] .sk-end .sk-only-challenge { display: none; }
+      .sk-end .sk-only-challenge { grid-column: span 2; }
+      .sk-end .sk-go { width: 100%; align-items: center; margin-top: 16px; min-height: 52px; }
+      .sk-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; margin: 14px 0 0; font-size: 14px; }
+      .sk-links a, .sk-link { text-underline-offset: 3px; }
+      .sk-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+      .sk-noscript { position: fixed; inset: auto 16px 16px; z-index: 40; padding: 12px 16px; border-radius: 12px; background: var(--sk-panel); }
+
+      /* 帧时间小窗（?fps=1） */
+      .sk-fps { position: fixed; z-index: 25; left: var(--sk-l); bottom: var(--sk-b); max-width: calc(100vw - 32px); padding: 5px 10px; border-radius: 8px; background: rgba(35, 65, 59, 0.82); color: #fcf8ee; font: 11px/1.5 var(--sk-mono); pointer-events: none; }
+      /* 手感面板 */
+      .sk-tune { position: fixed; z-index: 20; right: var(--sk-r); bottom: var(--sk-b); width: min(330px, calc(100vw - 32px)); max-height: 62vh; overflow: auto; padding: 12px 14px; border-radius: 16px; background: var(--sk-panel); box-shadow: var(--sk-shadow); font-size: 12px; -webkit-user-select: text; user-select: text; }
+      .sk-tune h3 { margin: 8px 0 6px; font-size: 13px; }
+      .sk-tune label { display: grid; grid-template-columns: 7.5em 1fr 3.2em; align-items: center; gap: 8px; margin: 3px 0; }
+      .sk-tune input[type='range'] { width: 100%; accent-color: var(--sk-pick); }
+      .sk-tune output { font-family: var(--sk-mono); text-align: right; }
+      .sk-tune textarea { display: block; width: 100%; margin-top: 8px; font: 11px/1.4 var(--sk-mono); border: 1px solid var(--sk-line); border-radius: 8px; background: #fff; color: var(--sk-ink); }
+      .sk-tune .sk-btn { margin-top: 8px; box-shadow: none; background: var(--sk-pick); color: var(--sk-paper); }
+
+      @media (max-width: 720px) {
+        .sk-brand span { display: none; } .sk-brand { padding: 6px; }
+        .sk-btn { padding: 0 10px; font-size: 12px; min-height: 34px; } .sk-tools { gap: 6px; }
+        .sk-sound input { display: none; }
+        .sk-hud { top: calc(var(--sk-t) + 48px); gap: 8px; }
+        .sk-score { padding: 7px 11px; gap: 10px; } .sk-score b { font-size: 18px; } .sk-score small { font-size: 11px; }
+        .sk-lap { flex: 1 1 90px; padding: 8px 10px; min-width: 70px; } .sk-clock { display: none; }
+        .sk-pens { gap: 4px; padding: 5px 9px; } .sk-pens i { width: 10px; height: 15px; } .sk-pens i.on { height: 20px; }
+        .sk-title h1 { font-size: clamp(44px, 17vw, 96px); }
+        .sk-title::before { background: linear-gradient(0deg, rgba(252, 248, 238, 0.92) 0%, rgba(252, 248, 238, 0.74) 44%, rgba(252, 248, 238, 0) 74%); }
+        .sk-title, .sk-end { left: var(--sk-l); bottom: calc(var(--sk-b) + 4vh); }
+        .sk-modes .sk-go { flex: 1 1 0; padding: 10px 14px; } .sk-go small { font-size: 11px; }
+        .sk-card { left: var(--sk-l); top: calc(var(--sk-t) + 132px); max-width: none; padding: 9px 14px 10px 16px; } .sk-card b { font-size: 19px; } .sk-card span { font-size: 12.5px; }
+        .sk-grade { font-size: 52px; }
+      }
+      @media (max-height: 480px) {
+        .sk-title h1 { font-size: clamp(38px, 16vh, 72px); margin: 6px 0 8px; }
+        .sk-premise { padding-top: 8px; font-size: 14px; } .sk-modes { margin-top: 12px; } .sk-go { min-height: 46px; } .sk-keys { margin-top: 10px; }
+        .sk-title, .sk-end { bottom: calc(var(--sk-b) + 8px); }
+        .sk-end { padding: 14px 18px; } .sk-end dl { margin-top: 10px; gap: 6px 10px; } .sk-pens-big { margin-top: 8px; padding: 6px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .sk-boot, .sk-title, .sk-end, .sk-loc, .sk-loc b, .sk-hud, .sk-card, .sk-combo, .sk-go { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </body>
+</html>

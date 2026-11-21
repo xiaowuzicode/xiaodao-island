@@ -1,6 +1,7 @@
 ---
 import { getCollection } from 'astro:content';
 import Base from '@/layouts/Base.astro';
+import HandbookCta from '@/components/HandbookCta.astro';
 import {
   loadIssues,
   groupByCategory,
@@ -109,5 +110,8 @@ const [y, m, d] = issue.date.split('-');
   }
 
   <div class="np-foot">本期完 · 明早邮船再来</div>
+  <HandbookCta>
+    日报每天早上更新。想在微信里看，搜索公众号「小岛AI」；也可以订阅 <a href="/rss.xml">RSS</a>。
+  </HandbookCta>
   <p class="np-back"><a href="/daily/">← 全部期数</a></p>
 </Base>

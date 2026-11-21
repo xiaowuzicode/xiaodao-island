@@ -2,6 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "headers": [
     {
+      "source": "/handbook/dl/:file*",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
+    {
       "source": "/posts/:slug/:dir(images|imgs)/:file*",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=2592000, stale-while-revalidate=31536000" }]
     },

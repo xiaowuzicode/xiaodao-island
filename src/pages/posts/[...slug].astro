@@ -1,6 +1,7 @@
 ---
 import { getCollection, render } from 'astro:content';
 import Base from '@/layouts/Base.astro';
+import HandbookCta from '@/components/HandbookCta.astro';
 import { postLd } from '@/lib/seo';
 import { buildRelated } from '@/lib/related';
 import { TOPICS, topicsOf } from '@/lib/topics';
@@ -64,13 +65,9 @@ function fmt(d: Date) {
         </ol>
       </nav>
     )}
-    <aside class="follow-card panel">
-      <p class="title">在微信里读我</p>
-      <p>
-        这些文章首发于公众号「小岛AI」，搜索即可关注。这里是它们的开放网络存档，欢迎订阅
-        <a href="/rss.xml">RSS</a>。
-      </p>
-    </aside>
+    <HandbookCta>
+      这些文章首发于公众号「小岛AI」，微信里搜索即可关注，也可以订阅 <a href="/rss.xml">RSS</a>。
+    </HandbookCta>
     {related.length > 0 && (
       <section class="related" aria-labelledby="related-h">
         <h2 id="related-h">接着读</h2>

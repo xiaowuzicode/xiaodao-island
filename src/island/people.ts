@@ -4,11 +4,11 @@
  */
 import * as THREE from 'three';
 import { PALETTE as P } from '@/island/config';
-import { Materials, bakeVertexColors, put, roundedBox } from '@/island/geo';
+import { Materials, bakeVertexColors, put, roundedBox, seeded } from '@/island/geo';
 
-export type Hair = 'short' | 'bob' | 'bun' | 'pony' | 'none';
+export type Hair = 'short' | 'bob' | 'bun' | 'pony' | 'curly' | 'none';
 export type Hat = 'cap' | 'straw' | 'beanie' | 'sailor' | 'keeper';
-export type Extra = 'backpack' | 'glasses' | 'scarf' | 'mailbag' | 'book' | 'brush' | 'collar';
+export type Extra = 'backpack' | 'glasses' | 'scarf' | 'mailbag' | 'book' | 'brush' | 'collar' | 'tee';
 export interface Look { skin: string; shirt: string; pants: string; shoes: string; hair: Hair; hairColor: string; hat?: Hat; hatColor?: string; extras?: Extra[] }
 
 export const SKINS = ['#f3d2b3', '#e6b791', '#c99572', '#9c6b4e'];
@@ -28,7 +28,7 @@ export interface Figure {
   stand(): void;
   /** 直接摆两只胳膊（绕肩前后转的弧度，负值往前抬，-π 举过头顶）：干活的动作用。 */
   arms(left: number, right: number): void;
-  /** 各关节（要自己摆姿势时用，比如按日程干活的人起伏身体）。 */
+  /** 各关节（给滑板小游戏这类要自己摆姿势的用；岛上的人不碰它）。 */
   parts: { body: THREE.Group; head: THREE.Group; legs: THREE.Group[]; arms: THREE.Group[] };
 }
 
@@ -49,6 +49,17 @@ function hair(mats: Materials, head: THREE.Object3D, look: Look) {
   cap.rotation.x = -0.42;
   if (look.hair === 'bob') put(head, new THREE.SphereGeometry(0.27, 14, 10), m, 0, -0.06, -0.06, { receive: false }).scale.set(1.05, 0.85, 0.9);
   if (look.hair === 'bun') put(head, new THREE.SphereGeometry(0.1, 10, 8), m, 0, 0.24, -0.14, { receive: false });
+  if (look.hair === 'curly') {
+    // 乱蓬蓬的卷发：头顶、两侧、后脑勺堆一圈小毛球，额前垂两撮
+    const puff = new THREE.SphereGeometry(1, 8, 6), rnd = seeded(27);
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2 * 3.1 + rnd(), el = 0.15 + (i / 26) * 1.25;
+      const x = Math.cos(a) * Math.cos(el) * 0.25, z = Math.sin(a) * Math.cos(el) * 0.25 - 0.03, y = Math.sin(el) * 0.25 + 0.03;
+      if (z > 0.12 && y < 0.17) continue; // 脸前面不长，露出额头和眼镜
+      put(head, puff, m, x, y, z, { receive: false }).scale.setScalar(0.085 + rnd() * 0.04);
+    }
+    for (const sx of [-0.09, 0.02, 0.12]) put(head, puff, m, sx, 0.2, 0.17, { receive: false }).scale.setScalar(0.075);
+  }
   if (look.hair === 'pony') put(head, new THREE.CapsuleGeometry(0.06, 0.22, 4, 8), m, 0, -0.08, -0.27, { receive: false }).rotation.x = 0.4;
 }
 
@@ -98,6 +109,8 @@ function extras(mats: Materials, body: THREE.Object3D, head: THREE.Object3D, loo
       put(body, roundedBox(0.12, 0.11, 0.03, 0.015), mats.get(P.paper), 0, 0.9, 0.155, { receive: false });
       put(body, new THREE.SphereGeometry(0.022, 6, 5), mats.get(EYE), 0, 0.74, 0.19, { cast: false, receive: false });
     }
+    // 敞开的外套里露出的白 T 恤：胸前一条竖着的白色，从领口到下摆
+    if (e === 'tee') put(body, roundedBox(0.2, 0.44, 0.05, 0.02), mats.get(P.paper), 0, 0.6, 0.135, { receive: false });
     if (e === 'glasses') {
       for (const sx of [-1, 1]) put(head, new THREE.TorusGeometry(0.055, 0.012, 6, 14), mats.get(EYE), sx * 0.085, 0.03, 0.252, { cast: false, receive: false });
       put(head, new THREE.BoxGeometry(0.06, 0.012, 0.012), mats.get(EYE), 0, 0.035, 0.256, { cast: false, receive: false });

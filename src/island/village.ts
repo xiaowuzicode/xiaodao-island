@@ -14,6 +14,17 @@ type XZ = [number, number];
 /** 已放下的小景 [x, z, 半径]，种树放花时避开。 */
 const PLACED: [number, number, number][] = [];
 export const nearVillage = (x: number, z: number) => PLACED.some(([px, pz, r]) => (px - x) ** 2 + (pz - z) ** 2 < r * r);
+/**
+ * 清掉已放下的小景记录。同一页里把岛再搭一遍（碰撞网格）之前调一下，第二遍才会摆在和第一遍一样的地方
+ * （不清的话第二遍会把第一遍摆过的位置当成「已经有东西」，挑到别处去）。邮差页用；首页、滑板页不调，行为不变。
+ */
+export const resetVillage = () => { PLACED.length = 0; };
+/**
+ * 这些小景照常挑地方、照常占地（种树、放花照样避开那一块，别处一棵树不挪），只是不摆出来。
+ * 邮差页用：后巷空地上的大榕树（树冠从离地 2.2 米罩到 6 米、宽近 8 米，五根气根一圈石凳），低机位的镜头在它底下没地方放。首页、滑板页不调，行为不变。
+ */
+const HIDDEN = new Set<string>();
+export const hideVillage = (...keys: ('banyan' | 'clothes' | 'fish' | 'cart')[]) => { HIDDEN.clear(); for (const k of keys) HIDDEN.add(k); };
 /** 各小景的候选位置（按优先级），以及要求的空地半径。 */
 const SPOTS: Record<'banyan' | 'clothes' | 'fish' | 'cart', { cands: XZ[]; clear: number; level: number }> = {
   banyan: { cands: [[-6.5, 9.5], [-9, 7], [13, 19], [-4, 8], [16, 16]], clear: 2.6, level: GROUND },
@@ -122,7 +133,7 @@ export function buildVillage(mats: Materials, parent: THREE.Object3D) {
   for (const key of Object.keys(builders) as (keyof typeof SPOTS)[]) {
     const at = findSpot(key);
     if (!at) continue;
-    builders[key](mats, parent, at);
+    if (!HIDDEN.has(key)) builders[key](mats, parent, at);
     PLACED.push([at[0], at[1], SPOTS[key].clear + 1.2]);
   }
 }

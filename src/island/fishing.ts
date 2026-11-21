@@ -1,10 +1,12 @@
 /**
- * 码头钓鱼：接过周伯的鱼竿，点海面甩竿；浮标被拽下水那一下，再点一下收竿。钓上来的东西嘴里（钳子里、背上）叼着一篇小岛的文章。
+ * 码头钓鱼：接过周伯的鱼竿，点海面甩竿；浮标被拽下水那一下按下去上钩，按住收线。钓上来的东西嘴里（钳子里、背上）叼着一篇小岛的文章。
  * 码头前面的水里游着几个看得见的影子（形状、大小不一）：瞄一个甩过去——落得太近会把它吓跑，甩到它前面一点，
  * 它会游过来、试探几下、再咬钩。礁鲨的背鳍游过浮标附近，线会被咬断。
  * 能钓上来什么、在哪一圈、什么时候出没，看物种表（fishing-species.ts）：金鱼、螃蟹，稀有的河豚、灯笼鱼、章鱼、海龟，
- * 传说中的旗鱼，还有海面上漂着的漂流瓶（甩到瓶子边上就勾住）。稀有的影子带一点微光；咬钩后要拉扯几下（「!」亮起时点）。
- * 钓上来的进周伯的鱼桶（fishing-bucket.ts），海龟放生；第一次钓到某一种记进图鉴（fishing-book.ts）。
+ * 传说中的旗鱼，还有海面上漂着的漂流瓶（甩到瓶子边上就勾住）。稀有的影子带一点微光。
+ * 浮标沉下去时按下去（鼠标、手指、空格）就上钩，接着按住收线、看底部张力条（fishing-reel.ts）：有劲的家伙会冲，冲的时候松手。
+ * 鱼竿是一节节能弯的（fishing-rod.ts），鱼拽得越狠弯得越厉害；拉出水先吊在竿梢扑腾一下，再甩进周伯的鱼桶（fishing-bucket.ts），
+ * 海龟放生；第一次钓到某一种记进图鉴（fishing-book.ts）。
  * 小鱼待在近处、大鱼待在外圈：钓鱼攒贝壳，点「钓鱼」旁的贝壳按钮升级鱼线、鱼饵、手感、买特饵（fishing-gear.ts）。
  * 游戏节奏按真实时间走（开了「减少动态效果」也能钓）；浪、水花仍跟动画时间，跟海面对得上。
  */
@@ -17,6 +19,8 @@ import { createBucket } from '@/island/fishing-bucket';
 import { BAIT_PATIENCE, GEAR, createGear, type GearKey } from '@/island/fishing-gear';
 import { bottleModel } from '@/island/fishing-models';
 import { createRange } from '@/island/fishing-range';
+import { createReelBar, startReel, stepReel, surging, type Reel } from '@/island/fishing-reel';
+import { createBendyRod } from '@/island/fishing-rod';
 import { createShadows } from '@/island/fishing-shadows';
 import { SPECIES, baitTargets, byId, featured, featuredNews, isRare, localDay, pickSpecies, type Species } from '@/island/fishing-species';
 import { Materials, put } from '@/island/geo';
@@ -56,16 +60,18 @@ const BITE = { scare: 1.3, quiet: 1.5, take: 0.35, nibbles: [0, 2], gap: [0.4, 0
 /** 浮标落在漂流瓶这么近（米）以内，就勾住它。 */
 const HOOK_BOTTLE = 1.6;
 /**
- * 拉扯（稀有、传说的才有）：每次「!」亮起前隔 gap 秒，亮着的时长 = 手感秒数 × window；
- * 亮着时点一下算拉住一下；点早了、没赶上都算松一次，松两次它就挣脱。挣扎时浮标在 run 米内乱窜。
+ * 收线时浮标怎么动：平时在 run 米内乱窜，冲的时候窜 surgeRun 米；收线进度满时，浮标从落点往码头拉近 near 的比例。
  */
-const FIGHT = { gap: [0.7, 1.4], window: 0.55, slips: 2, run: 0.8 } as const;
+const FIGHT = { run: 0.6, surgeRun: 1.6, near: 0.55 } as const;
 /** 新文章船开到离鱼这么近（米），鱼会窜开。 */
 const SHIP_SCARE = 5;
 /** 咬钩那一刻礁鲨背鳍离浮标这么近（米），线就被咬断。 */
 const SHARK_CUT = 4;
-/** 收竿：鱼从水里飞进周伯鱼桶的秒数、弧顶高度（米）；空钩收回来的秒数；放生的往外抛多远（米）；河豚鼓多大。 */
-const REEL = { seconds: 1.2, arc: 3, emptySeconds: 0.6, release: 3, puff: 0.6 } as const;
+/**
+ * 拉出水：先提到竿梢下面 hang 米（lift 秒，往上拱 liftArc 米；鱼身中心至少离海面 体型 × clear 米），吊着扑腾 show 秒，再甩进周伯鱼桶（toss 秒，弧顶 arc 米）；
+ * 空钩收回来的秒数；放生的往外抛多远（米）；河豚鼓多大。
+ */
+const REEL = { lift: 0.55, liftArc: 0.8, hang: 1, clear: 0.9, show: 0.9, toss: 0.8, arc: 3, emptySeconds: 0.6, release: 3, puff: 0.6 } as const;
 /** 点在鱼桶这么近（米）以内，打开图鉴。 */
 const BUCKET_TAP = 0.7;
 /** 线断之后提示停留几秒再回到可以甩竿。 */
@@ -74,8 +80,17 @@ const PAUSE_SECONDS = 1.4;
 const NEWS_AFTER = 4;
 /** 浮标：半径（米）、平时吃水、被试探时、被拽下去时的高度（相对原设计基线）。 */
 const BOBBER = { radius: 0.12, lift: -0.1, nibble: -0.2, under: -0.45 } as const;
-/** 鱼竿俯仰（rotation.x）：平时、甩竿往后扬、甩出去、被拽弯、收竿往上抬。周伯坐着时是 0.9。 */
-const ROD = { rest: 0.9, back: 0.2, out: 1.15, bite: 1.35, up: 0.55 } as const;
+/** 鱼竿俯仰（rotation.x）：平时、甩竿往后扬、甩出去、被拽、收线时竿往上举、提鱼出水往上抬。周伯坐着时是 0.9。 */
+const ROD = { rest: 0.9, back: 0.2, out: 1.15, bite: 1.05, fight: 0.62, up: 0.45 } as const;
+/**
+ * 鱼竿弯多少（弧度，整根竿从根到梢一共弯过的角度）：平时自重微弯、甩竿往后扬时反弯、等鱼、被试探时、咬钩、
+ * 收线时基础弯度 + 张力 × tension、冲的时候再抖、吊着鱼。
+ */
+const BEND = { rest: 0.12, whip: -0.3, wait: 0.2, nibble: 0.38, bite: 0.8, fight: 0.3, tension: 1.15, shake: 0.08, hang: 0.55 } as const;
+/** 鱼竿左右转向浮标（弧度上限）、转过去的快慢（每秒的指数系数）。 */
+const YAW = { max: 0.6, follow: 5 } as const;
+/** 浮标漂着时每隔几秒自己荡一圈涟漪（试探、咬钩、落水也各荡一圈）。 */
+const RIPPLE_EVERY = [2.2, 3.4] as const;
 /** 灯笼摆在码头右边那摞木箱顶上（夜里亮），世界坐标。钓鱼时借最远的一盏路灯的光源挂在这里，照亮周伯和鱼桶。 */
 const LANTERN = [1.05, 2.02, 36.6] as const;
 /** 升级、新发现时迸出的金色火花：几颗、飞多快（米/秒）、持续几秒。 */
@@ -171,6 +186,12 @@ interface Deps {
   hud: HTMLElement;
   button: HTMLButtonElement;
   wake: () => void;
+  /** 只荡开一圈涟漪（不惊动水下生物）：浮标被试探、咬钩时用。 */
+  ripple: (x: number, z: number) => void;
+  /** 画布：咬钩、收线时在它上面按下去算「按住收线」（这时不转镜头）。 */
+  canvas: HTMLElement;
+  /** 张力条的容器（fishing-reel.ts 往里画）。 */
+  reelBar: HTMLElement;
 }
 
 export function createFishing(d: Deps) {
@@ -307,6 +328,11 @@ export function createFishing(d: Deps) {
   spool.position.set(0, 0.35, 0.09);
   spool.visible = false;
   d.rod.add(spool);
+  // 直竿换成能弯的；竿先左右转（对着浮标）再俯仰
+  const bendy = createBendyRod(d.rod, d.tip, d.mats.get(P.woodDark));
+  d.rod.rotation.order = 'YXZ';
+  bendy.setBend(BEND.rest);
+  const bar = createReelBar(d.reelBar);
 
   // 金色火花：一池小金星，平时藏着
   const sparkCanvas = document.createElement('canvas');
@@ -383,10 +409,15 @@ export function createFishing(d: Deps) {
   let clipped = false;
   /** 这一竿已经提醒过一次「还在试探」；这条鱼已经错过一次咬钩；这一竿已经扣过特饵。 */
   let warned = false, missed = false, baitSpent = false;
-  /** 拉扯：要拉几下、拉住了几下、松了几次；这一次「!」亮起、熄灭的时刻，亮起的提示说过没有。 */
-  const fight = { need: 0, done: 0, slips: 0, at: 0, end: 0, told: false };
+  /** 收线这一局（张力、进度）；按没按着；上一帧在不在冲、是不是太紧（变了才换提示）。 */
+  let reeling: Reel | null = null, holding = false, wasSurge = false, wasOver = false;
+  /** 收线时浮标此刻的位置（拉出水就从这儿出水）。 */
+  const hooked = { x: 0, z: 0 };
+  /** 浮标下一次自己荡涟漪的时刻；上一帧是不是在被试探；鱼竿现在左右转了多少。 */
+  let rippleAt = 0, wasDip = false, yaw = 0;
   let turnAt = TURNOVER.first, newsAt = Infinity;
 
+  const holdHint = () => (matchMedia('(pointer: coarse)').matches ? '按住屏幕' : '按住鼠标或空格');
   function hud(text: string) {
     if (d.hud.textContent !== text) d.hud.textContent = text;
     d.hud.hidden = false;
@@ -430,6 +461,13 @@ export function createFishing(d: Deps) {
     }
   }
 
+  /** 新文章船开到 (x, z) 附近：鱼窜开；正游过来、正咬钩的那条也跑了。已经上钩在收线的那条挂在线上，吓不跑。 */
+  function shipScare(f: Fish, x: number, z: number) {
+    if (f === taker && state === 'fight') return;
+    if (f === taker) release();
+    dartAway(f, x, z);
+  }
+
   /** 一个影子往前游一步：转向游向点，游到了换一个；窜开时直着冲。 */
   function swim(f: Fish, dt: number) {
     if (f.gone) {
@@ -443,10 +481,7 @@ export function createFishing(d: Deps) {
       f.fade -= dt * SWIM.fade;
       if (f.fade <= 0) { f.leave = false; f.gone = SWIM.respawn; return; }
     } else f.fade = Math.min(1, f.fade + dt * SWIM.fade);
-    if (d.ship.visible && now >= f.dartUntil && distTo(f, d.ship.position.x, d.ship.position.z) < SHIP_SCARE) {
-      if (f === taker) release();
-      dartAway(f, d.ship.position.x, d.ship.position.z);
-    }
+    if (d.ship.visible && now >= f.dartUntil && distTo(f, d.ship.position.x, d.ship.position.z) < SHIP_SCARE) shipScare(f, d.ship.position.x, d.ship.position.z);
     if (f === taker && f.sp.id === 'bottle') return; // 勾住的瓶子跟着浮标
     let speed = SWIM.speed * f.sp.speed;
     if (now < f.dartUntil) speed = SWIM.dart * Math.max(f.sp.speed, 0.5);
@@ -520,6 +555,7 @@ export function createFishing(d: Deps) {
     nibbles = [];
     biteAt = Infinity;
     landAt = now;
+    rippleAt = now + rand(...RIPPLE_EVERY);
     warned = missed = baitSpent = false;
     quietUntil = scared.length ? now + BITE.quiet : 0;
     // 落在漂流瓶边上：直接勾住，不用等
@@ -529,7 +565,7 @@ export function createFishing(d: Deps) {
       bottle.x = target.x;
       bottle.z = target.z;
       go('bite');
-      hud('勾住一只漂流瓶！点一下收线');
+      hud(`勾住一只漂流瓶！${holdHint()}收线`);
       return;
     }
     go('wait');
@@ -580,59 +616,49 @@ export function createFishing(d: Deps) {
     baitSpent = true;
     d.splashes.trigger(target.x, target.z, 0.45, animT);
     go('bite');
-    const strong = taker && taker.sp.pulls > 0;
-    hud(`${strong ? '咬钩了！是个有劲的家伙，点一下开始拉' : '咬钩了！快点一下收竿'}${spent && !gear.using ? '（特饵用完了）' : ''}`);
+    d.ripple(target.x, target.z);
+    hud(`咬钩了！${holdHint()}收线${spent && !gear.using ? '（特饵用完了）' : ''}`);
   }
 
-  /** 拉扯：排下一次「!」亮起。 */
-  function nextTug() {
-    fight.at = now + rand(...FIGHT.gap);
-    fight.end = fight.at + gear.value('reel') * FIGHT.window;
-    fight.told = false;
-  }
-  function startFight(sp: Species) {
-    fight.need = sp.pulls;
-    fight.done = fight.slips = 0;
-    nextTug();
+  /** 上钩：摆好张力条，开始收线（这一下要是按着的，就接着算按住）。 */
+  function hook(sp: Species) {
+    reeling = startReel(sp, gear.level('reel'));
+    wasSurge = wasOver = false;
+    hooked.x = target.x;
+    hooked.z = target.z;
+    const known = sp.id === 'bottle' || (gear.records().kinds[sp.name] ?? 0) > 0;
+    bar.show(sp.id === 'bottle' ? '勾住一只漂流瓶' : `上钩：${known ? sp.name : '没见过的家伙'}`, reeling);
+    d.ripple(target.x, target.z);
     go('fight');
-    hud(`它在挣扎！等「!」亮起时点一下（0/${fight.need}）`);
+    hud(reeling.force > 0 ? `是个有劲的家伙！${holdHint()}收线，它冲的时候松手` : `${holdHint()}收线`);
   }
-  /** 松了一下：再松一次就挣脱。 */
-  function slip(why: string) {
-    fight.slips++;
-    if (fight.slips < FIGHT.slips) {
-      nextTug();
-      hud(`${why}，线松了一下！再错一次它就跑了（${fight.done}/${fight.need}）`);
-      return;
-    }
-    const sp = taker?.sp;
-    d.splashes.trigger(target.x, target.z, 0.7, animT);
+  /** 收线没成：线断了或者它溜了。 */
+  function lost(text: string) {
+    bar.hide();
+    reeling = null;
+    d.splashes.trigger(hooked.x, hooked.z, 0.7, animT);
+    target = { ...hooked };
     release();
     go('empty');
-    hud(`${why}——它挣脱了。${sp ? `${sp.hint.split('，')[0]}还会再遇到` : ''}`);
-  }
-  function tug() {
-    if (now < fight.at || now > fight.end) { slip('点早了'); return; }
-    fight.done++;
-    d.splashes.trigger(target.x, target.z, 0.5, animT);
-    if (fight.done >= fight.need) { haul(); return; }
-    nextTug();
-    hud(`拉住了！${fight.done}/${fight.need}，等下一次「!」`);
+    hud(text);
   }
 
   function reel() {
-    if (state === 'fight') { tug(); return; }
-    if (state === 'wait' && taker && biteAt !== Infinity && !warned) { warned = true; hud('它还在试探，等浮标沉下去再点'); return; }
+    if (state === 'wait' && taker && biteAt !== Infinity && !warned) { warned = true; hud('它还在试探，等浮标沉下去再按'); return; }
     if (state === 'wait') { release(); go('empty'); hud('收早了，鱼还没咬钩'); return; }
     if (state !== 'bite' || !taker) return;
-    if (taker.sp.pulls > 0) { startFight(taker.sp); return; }
-    haul();
+    hook(taker.sp);
   }
 
-  /** 拉出水：它从浮标处跃出水面，进鱼桶（放生的往外抛回海里）。 */
+  /** 拉出水：它从浮标此刻的位置跃出水面，先吊在竿梢扑腾一下，再进鱼桶（放生的往外抛回海里）。 */
   function haul() {
-    if (!taker) return;
+    // 线那头已经没有鱼（不该发生）：当它挣脱了，退回能甩竿，别卡在收线里
+    if (!taker) { console.warn('[fishing] 收线到头但线上没有鱼，按挣脱处理'); lost('它挣脱了，再甩一竿'); return; }
+    bar.hide();
+    reeling = null;
+    target = { ...hooked };
     d.splashes.trigger(target.x, target.z, 0.6, animT);
+    d.ripple(target.x, target.z);
     catchSp = taker.sp;
     taker.gone = SWIM.respawn;
     taker = null;
@@ -660,6 +686,10 @@ export function createFishing(d: Deps) {
     const could = gear.affordable();
     const first = gear.caught(sp, cm, a ? { title: a.title, url: a.url } : null);
     const nudge = !could && gear.affordable() ? ' · 贝壳够升级了，点「钓鱼」旁的贝壳按钮' : '';
+    // 贝壳数跳一下（重新挂上动画类才会再播一次）
+    d.gear.count.classList.remove('is-pop');
+    void d.gear.count.offsetWidth;
+    d.gear.count.classList.add('is-pop');
     if (sp.keep) {
       bucket.fill(gear.recent);
       bucket.drop(now);
@@ -698,29 +728,118 @@ export function createFishing(d: Deps) {
     }
     if (!on) {
       release();
+      bar.hide();
+      reeling = null;
+      holding = false;
       state = 'off';
       d.hud.hidden = true;
+      // 周伯接着自己钓：竿摆回原位
+      yaw = 0;
+      d.rod.rotation.set(ROD.rest, 0, 0);
+      bendy.setBend(BEND.rest);
       return;
     }
     go('ready');
     newsAt = now + NEWS_AFTER;
-    hud('点海面甩竿，甩到鱼影前面一点（别砸在鱼身上）；浮标沉下去时，再点一下或按空格收竿');
+    hud(`点海面甩竿，甩到鱼影前面一点（别砸在鱼身上）；浮标沉下去时${holdHint()}收线`);
   }
 
-  /** 这一帧鱼竿的俯仰：先定竿，再按竿梢算线，线才接得上竿梢。 */
-  function rodAngle(u: number) {
+  const lerp = THREE.MathUtils.lerp;
+  /** 这一帧鱼竿的 [俯仰, 弯度]：先定竿，再按竿梢算线，线才接得上竿梢。dip = 浮标正被试探。 */
+  function rodPose(u: number, dip: boolean): [number, number] {
     switch (state) {
       case 'cast': {
-        const k = clamp01(u / CAST.seconds);
-        return k < 0.3 ? THREE.MathUtils.lerp(ROD.rest, ROD.back, k / 0.3) : THREE.MathUtils.lerp(ROD.back, ROD.out, Math.min(1, (k - 0.3) / 0.25));
+        const k = clamp01(u / CAST.seconds), back = k < 0.3, f = back ? k / 0.3 : Math.min(1, (k - 0.3) / 0.25);
+        return back ? [lerp(ROD.rest, ROD.back, f), lerp(BEND.rest, BEND.whip, f)] : [lerp(ROD.back, ROD.out, f), lerp(BEND.whip, BEND.wait, f)];
       }
-      case 'bite': return ROD.bite + Math.sin(now * 38) * 0.04;
-      case 'fight': return ROD.bite + Math.sin(now * 14) * (now >= fight.at && now <= fight.end ? 0.12 : 0.06);
-      case 'reel': return THREE.MathUtils.lerp(ROD.bite, ROD.up, Math.min(1, (u / REEL.seconds) * 2));
-      case 'empty': return THREE.MathUtils.lerp(ROD.out, ROD.up, clamp01(u / REEL.emptySeconds));
-      case 'wait': return ROD.out + Math.sin(now * 0.8) * 0.03;
-      default: return ROD.rest + Math.sin(now * 0.8) * 0.06;
+      case 'bite': return [ROD.bite + Math.sin(now * 38) * 0.03, BEND.bite + Math.sin(now * 38) * 0.06];
+      case 'fight': {
+        const r = reeling, surge = !!r && surging(r);
+        const shake = surge ? Math.sin(now * 22) * BEND.shake : Math.sin(now * 9) * 0.02;
+        return [ROD.fight + (surge ? Math.sin(now * 16) * 0.05 : 0), BEND.fight + (r?.tension ?? 0) * BEND.tension + shake];
+      }
+      case 'reel': {
+        if (u < REEL.lift) { const k = u / REEL.lift; return [lerp(ROD.fight, ROD.up, k), lerp(BEND.fight + BEND.tension * 0.5, BEND.hang, k)]; }
+        if (u < REEL.lift + REEL.show) return [ROD.up + Math.sin(now * 9) * 0.03, BEND.hang + Math.sin(now * 14) * 0.07];
+        const k = clamp01((u - REEL.lift - REEL.show) / REEL.toss);
+        return [lerp(ROD.up, ROD.rest, k), lerp(BEND.hang, BEND.rest, k)];
+      }
+      case 'empty': return [lerp(ROD.out, ROD.up, clamp01(u / REEL.emptySeconds)), BEND.rest];
+      case 'wait': return [ROD.out + Math.sin(now * 0.8) * 0.03, dip ? BEND.nibble : BEND.wait];
+      default: return [ROD.rest + Math.sin(now * 0.8) * 0.06, BEND.rest];
     }
+  }
+
+  /** 鱼竿左右转向浮标（转到周伯身体的局部坐标里算）；没甩出去时转回正前方。 */
+  function aimRod(dt: number) {
+    let want = 0;
+    const aiming = state === 'wait' || state === 'bite' || state === 'fight' || state === 'empty' || (state === 'cast' && now - since > CAST.seconds * 0.3);
+    if (aiming && d.rod.parent) {
+      const at = state === 'fight' ? hooked : target;
+      d.rod.parent.worldToLocal(pos.set(at.x, 0, at.z)).sub(d.rod.position);
+      want = THREE.MathUtils.clamp(Math.atan2(pos.x, pos.z), -YAW.max, YAW.max);
+    }
+    yaw += (want - yaw) * (1 - Math.exp(-YAW.follow * dt));
+  }
+
+  /** 收线一帧：推进张力条；浮标随张力乱窜、冲的时候窜得远，随进度往码头拉近；影子跟着浮标。 */
+  function fightStep(r: Reel, dt: number, t: number) {
+    const res = stepReel(r, dt, holding);
+    bar.update(r, holding);
+    const surge = surging(r), over = r.tension > r.hi;
+    if (surge && !wasSurge) { d.splashes.trigger(hooked.x, hooked.z, 0.55, animT); d.ripple(hooked.x, hooked.z); }
+    if (surge !== wasSurge || over !== wasOver) {
+      hud(over ? '太紧了！松手，线要断了' : surge ? '它在冲！先松手' : wasSurge ? `冲完了，${holdHint()}接着收` : `${holdHint()}收线`);
+    }
+    wasSurge = surge;
+    wasOver = over;
+    if (res === 'landed') { haul(); return; }
+    if (res === 'snapped') { lost('啪——线绷断了。它冲的时候要松手'); return; }
+    if (res === 'slack') { lost('线松太久，它溜了。咬钩后要按住收线'); return; }
+    const near = r.progress * FIGHT.near, run = surge ? FIGHT.surgeRun : FIGHT.run;
+    hooked.x = lerp(target.x, tipW.x, near) + Math.sin(now * (surge ? 3.1 : 1.7)) * run;
+    hooked.z = lerp(target.z, tipW.z, near) + Math.cos(now * (surge ? 2.3 : 1.3)) * run;
+    if (shoreDistance(hooked.x, hooked.z) < CAST_SHORE_MIN) { hooked.x = target.x; hooked.z = target.z; }
+    floatOn(bobber, hooked.x, hooked.z, 0, t, BOBBER.under, 6);
+    drawLine(tipW, bobber.position, 0.005);
+    if (taker) {
+      taker.heading = Math.atan2(hooked.z - taker.z, hooked.x - taker.x) || taker.heading;
+      taker.x = hooked.x - Math.cos(taker.heading) * taker.sp.len * 0.45;
+      taker.z = hooked.z - Math.sin(taker.heading) * taker.sp.len * 0.45;
+    }
+  }
+
+  /** 拉出水一帧：提到竿梢下面 → 吊着扑腾 → 甩进鱼桶（放生的抛回海里）。 */
+  function reelStep(c: Creature, u: number) {
+    const sp = catchSp, head = sp.scale * 0.35;
+    // 吊着时鱼头朝上挂在竿梢下面，跟着竿晃
+    pos.set(tipW.x + Math.sin(now * 5) * 0.12, tipW.y - REEL.hang - head, tipW.z + Math.cos(now * 4) * 0.06);
+    // 大鱼（旗鱼）身子长：吊着时别泡进海里
+    pos.y = Math.max(pos.y, seaY(pos.x, pos.z, animT) + sp.scale * REEL.clear);
+    if (sp.keep) to.copy(bucket.rim);
+    else releasePoint(to);
+    const face = Math.atan2(to.z - target.z, to.x - target.x);
+    if (u < REEL.lift + REEL.show) {
+      const k = clamp01(u / REEL.lift);
+      from.set(target.x, BOBBER.lift, target.z);
+      c.root.position.lerpVectors(from, pos, k);
+      c.root.position.y += REEL.liftArc * 4 * k * (1 - k);
+      c.root.rotation.set(0, -face, (Math.PI / 2) * k + Math.sin(now * 14) * 0.35 * k);
+      c.tail.rotation.y = Math.sin(now * 26) * 0.7;
+      drawLine(tipW, from.copy(c.root.position).setY(c.root.position.y + head), 0);
+    } else {
+      // 甩进鱼桶：从吊着的地方划一道弧
+      const k = clamp01((u - REEL.lift - REEL.show) / REEL.toss);
+      c.root.position.lerpVectors(pos, to, k);
+      c.root.position.y += REEL.arc * 4 * k * (1 - k);
+      c.root.rotation.set(0, -face, lerp(Math.PI / 2, 0, k));
+      c.tail.rotation.y = Math.sin(now * 30) * 0.6;
+      drawLine(tipW, c.root.position, 0);
+      if (k >= 1) { landed(); return; }
+    }
+    // 河豚一出水就鼓起来
+    const puff = sp.puff ? 1 + REEL.puff * THREE.MathUtils.smoothstep(u, 0, REEL.lift) : 1;
+    c.root.scale.set(sp.scale, sp.scale * puff, sp.scale * puff);
   }
 
   /** 画线：竿梢到浮标，中间按线长往下垂一点。 */
@@ -736,11 +855,30 @@ export function createFishing(d: Deps) {
     lineGeo.attributes.position.needsUpdate = true;
   }
 
+  // 按下：等鱼时算收竿（收早了会提示）；咬钩时上钩并开始按住收线；收线时按住。松开（或切走页面）就是松手。
+  const press = () => {
+    if (state === 'fight') holding = true;
+    else if (state === 'bite') { holding = true; reel(); }
+    else if (state === 'wait') reel();
+  };
+  const letGo = () => (holding = false);
   document.addEventListener('keydown', (e) => {
     if (e.code !== 'Space' || (state !== 'wait' && state !== 'bite' && state !== 'fight')) return;
     e.preventDefault();
-    reel();
+    if (!e.repeat) press();
   });
+  document.addEventListener('keyup', (e) => { if (e.code === 'Space') letGo(); });
+  // 咬钩、收线时在画布上按下去：先于镜头拿到（捕获阶段），不让它转镜头；点在别的控件上不算
+  window.addEventListener('pointerdown', (e) => {
+    // 只在真有鱼可收时拦下（拦下后镜头就转不了）：咬钩中、收线中
+    const busy = (state === 'bite' && taker) || (state === 'fight' && reeling);
+    if (e.target !== d.canvas || !e.isPrimary || e.button !== 0 || !busy) return;
+    e.stopPropagation();
+    e.preventDefault();
+    press();
+  }, { capture: true });
+  for (const ev of ['pointerup', 'pointercancel', 'blur'] as const) window.addEventListener(ev, letGo);
+  document.addEventListener('visibilitychange', letGo);
   d.button.addEventListener('click', () => setActive(state === 'off'));
 
   return {
@@ -763,6 +901,8 @@ export function createFishing(d: Deps) {
       f.fade = 1;
       return true;
     },
+    /** 调试用：假装新文章船从每条鱼身边开过（复现收线时船开过的情况）。 */
+    debugShipPass() { for (const f of fishes) if (!f.gone) shipScare(f, f.x + 1, f.z); },
     setActive,
     /** 钓鱼时点画布：hit 是点中的世界位置（water=点在海面上），没点中东西为 null。点周伯的鱼桶打开图鉴。 */
     tap(hit: { p: THREE.Vector3; water: boolean } | null) {
@@ -781,8 +921,18 @@ export function createFishing(d: Deps) {
       now += realDt;
       const u = now - since;
       d.angler.visible = true;
-      d.rod.rotation.x = rodAngle(u);
+      const dip = state === 'wait' && nibbles.some((n) => now > n && now < n + BITE.nibbleSeconds);
+      const [pitch, bend] = rodPose(u, dip);
+      aimRod(realDt);
+      d.rod.rotation.set(pitch, yaw, 0);
+      bendy.setBend(bend);
       d.tip.getWorldPosition(tipW);
+      // 浮标漂着时偶尔自己荡一圈涟漪；被试探的那一下也荡一圈
+      if (state === 'wait' && ((dip && !wasDip) || now >= rippleAt)) {
+        d.ripple(target.x, target.z);
+        rippleAt = now + rand(...RIPPLE_EVERY);
+      }
+      wasDip = dip;
       // 鱼塘轮换：随机一个游走，换一个新的进来（稀有的轮到这里才有机会出现）
       if (now >= turnAt) {
         turnAt = now + rand(...TURNOVER.every);
@@ -795,11 +945,10 @@ export function createFishing(d: Deps) {
       bobber.visible = state !== 'ready' && state !== 'pause' && state !== 'reel';
       line.visible = state !== 'ready' && state !== 'pause';
       for (const c of catchModels.values()) c.root.visible = state === 'reel' && c === caught;
-      const tugging = state === 'fight' && now >= fight.at && now <= fight.end;
-      mark.visible = state === 'bite' || tugging;
+      mark.visible = state === 'bite';
       if (mark.visible) {
-        drawMark(tugging ? (fight.end - now) / (fight.end - fight.at) : taker?.sp.id === 'bottle' ? 1 : 1 - u / gear.value('reel'));
-        const pop = Math.min(1, (tugging ? now - fight.at : u) / 0.12) * (1 + Math.sin(now * 18) * 0.08);
+        drawMark(taker?.sp.id === 'bottle' ? 1 : 1 - u / gear.value('reel'));
+        const pop = Math.min(1, u / 0.12) * (1 + Math.sin(now * 18) * 0.08);
         mark.position.set(bobber.position.x, seaY(bobber.position.x, bobber.position.z, t) + MARK.lift, bobber.position.z);
         mark.scale.setScalar(MARK.size * pop);
       }
@@ -829,7 +978,6 @@ export function createFishing(d: Deps) {
         if (k >= 1) land();
       } else if (state === 'wait') {
         waitStep();
-        const dip = nibbles.some((n) => now > n && now < n + BITE.nibbleSeconds);
         if (state === 'wait') {
           floatOn(bobber, target.x, target.z, 0, t, dip ? BOBBER.nibble : BOBBER.lift, 6);
           drawLine(tipW, bobber.position, SAG);
@@ -855,40 +1003,18 @@ export function createFishing(d: Deps) {
           }
         }
       } else if (state === 'fight') {
-        // 挣扎：浮标在落点附近乱窜，影子跟着浮标
-        const bx = target.x + Math.sin(now * 1.7) * FIGHT.run, bz = target.z + Math.cos(now * 1.3) * FIGHT.run;
-        floatOn(bobber, bx, bz, 0, t, BOBBER.under, 6);
-        drawLine(tipW, bobber.position, 0.005);
-        if (taker) {
-          taker.heading = Math.atan2(bz - taker.z, bx - taker.x) || taker.heading;
-          taker.x = bx - Math.cos(taker.heading) * taker.sp.len * 0.45;
-          taker.z = bz - Math.sin(taker.heading) * taker.sp.len * 0.45;
-        }
-        if (tugging && !fight.told) { fight.told = true; hud(`现在！点一下拉（${fight.done}/${fight.need}）`); }
-        if (now > fight.end) slip('慢了一步');
+        // 收线时一定有这一局和线上的鱼；缺了就按挣脱处理，不让画面停在半路
+        if (reeling && taker) fightStep(reeling, realDt, t);
+        else { console.warn(`[fishing] 收线状态缺${reeling ? '' : '张力条'}${taker ? '' : '线上的鱼'}，按挣脱处理`); lost('它挣脱了，再甩一竿'); }
       } else if (state === 'reel' && caught) {
-        const k = clamp01(u / REEL.seconds);
-        // 从浮标处跃出水面，划一道弧落进周伯的鱼桶；放生的往外抛回海里
-        from.set(target.x, BOBBER.lift, target.z);
-        if (catchSp.keep) to.copy(bucket.rim);
-        else releasePoint(to);
-        caught.root.position.lerpVectors(from, to, k);
-        caught.root.position.y += REEL.arc * 4 * k * (1 - k);
-        const heading = Math.atan2(to.z - from.z, to.x - from.x);
-        caught.root.rotation.set(0, -heading, Math.atan2(REEL.arc * Math.PI * Math.cos(k * Math.PI), from.distanceTo(to)) * 0.6);
-        caught.tail.rotation.y = Math.sin(now * 30) * 0.6;
-        // 河豚一出水就鼓起来
-        const puff = catchSp.puff ? 1 + REEL.puff * THREE.MathUtils.smoothstep(k, 0, 0.4) : 1;
-        caught.root.scale.set(catchSp.scale, catchSp.scale * puff, catchSp.scale * puff);
-        drawLine(tipW, caught.root.position, 0);
-        if (k >= 1) landed();
+        reelStep(caught, u);
       } else if (state === 'empty') {
         const k = clamp01(u / REEL.emptySeconds);
         from.set(target.x, BOBBER.lift, target.z);
         bobber.position.lerpVectors(from, tipW, k);
         bobber.position.y += 1.5 * 4 * k * (1 - k);
         drawLine(tipW, bobber.position, 0);
-        if (k >= 1) { go('ready'); if (!d.hud.textContent?.includes('挣脱')) hud('鱼饵还在，瞄准鱼影再甩一竿'); }
+        if (k >= 1) { go('ready'); if (!/断|溜/.test(d.hud.textContent ?? '')) hud('鱼饵还在，瞄准鱼影再甩一竿'); }
       }
     },
   };

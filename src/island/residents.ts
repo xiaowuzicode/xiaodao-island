@@ -84,13 +84,14 @@ export const ROLES: Role[] = [
   { name: '阿山', hours: [[5.5, 17.5]], say: 'hiker', kind: 'trail', look: look({ shirt: '#5aa58c', pants: '#6b5a44', hat: 'cap', hatColor: P.roofYellow, extras: ['backpack'] }, 12) },
 ];
 
-interface Walker { fig: Figure; role: Extract<Role, { kind: 'walk' }>; seg: number; along: number; pause: number; y: number; phase: number; amount: number }
+interface Walker { fig: Figure; role: Extract<Role, { kind: 'walk' }>; seg: number; along: number; pause: number; y: number; phase: number; amount: number; aside?: number }
 interface Jogger { fig: Figure; a: number; dir: 1 | -1; phase: number }
 interface Hiker { fig: Figure; i: number; dir: 1 | -1; phase: number; pause: number }
 /** 岛民的名字、台词类别和当前位置（给对白气泡用）。 */
 /** topic：夜市摊主守的专题（slug），气泡按它挑台词。 */
+/** fig：这个人的关节（滑板小游戏让路过的人挥手用；首页不用）。 */
 /** hours：这个人的作息（点到他时卡片里写几点到几点在岛上）。 */
-export interface Actor { name: string; say: SayKey; root: THREE.Object3D; topic?: string; hours?: Shift[] }
+export interface Actor { name: string; say: SayKey; root: THREE.Object3D; topic?: string; fig?: Figure; hours?: Shift[] }
 
 const heightAt = (x: number, z: number, fallback: number = LEVEL.sand) => walkY(x, z) ?? fallback;
 
@@ -115,12 +116,29 @@ function placeSitter(mats: Materials, fig: Figure, role: Extract<Role, { kind: '
   return rod;
 }
 
-function stepWalker(w: Walker, dt: number) {
+/**
+ * 给滑板小游戏用的「让一让」：near 是正在附近滑的人（首页不传，行为不变）。离他 YIELD.near 米以内：走路的停下来、往路边让半米，
+ * 慢跑的、爬山的原地站住；人走远了再接着走、慢慢回到路中间。
+ */
+const YIELD = { near: 1.8, aside: 0.55 } as const;
+const close = (fig: Figure, near?: { x: number; z: number }) => !!near && Math.hypot(fig.root.position.x - near.x, fig.root.position.z - near.z) < YIELD.near;
+
+function stepWalker(w: Walker, dt: number, near?: { x: number; z: number }) {
   const r = w.role.route;
-  const moving = r.length > 1 && w.pause <= 0;
+  const yielding = close(w.fig, near);
+  // 往路边让：朝离滑板远的那一侧，让开半米；没事了慢慢回来
+  if (near || w.aside) {
+    const a = r[w.seg], b = r[(w.seg + 1) % r.length] ?? a, px = -(b[1] - a[1]), pz = b[0] - a[0], pl = Math.hypot(px, pz) || 1;
+    const want = yielding && near ? Math.sign((w.fig.root.position.x - near.x) * px + (w.fig.root.position.z - near.z) * pz || 1) * YIELD.aside : 0;
+    const was = w.aside ?? 0;
+    w.aside = was + (want - was) * Math.min(1, dt * 4);
+    w.fig.root.position.x += ((px / pl) * (w.aside - was));
+    w.fig.root.position.z += ((pz / pl) * (w.aside - was));
+  }
+  const moving = r.length > 1 && w.pause <= 0 && !yielding;
   w.amount += ((moving ? 1 : 0) - w.amount) * Math.min(1, dt * 6);
   w.fig.pose(w.phase, w.amount);
-  if (!moving) { w.pause -= dt; return; }
+  if (!moving) { if (!yielding) w.pause -= dt; return; }
   const a = r[w.seg], b = r[(w.seg + 1) % r.length];
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
   const step = SPEED.walk * (w.role.kid ? SPEED.kidBoost : 1) * (w.role.pace ?? 1) * dt;
@@ -132,7 +150,7 @@ function stepWalker(w: Walker, dt: number) {
     w.pause = b[2] ?? 0;
     return;
   }
-  const k = w.along / len, x = a[0] + (b[0] - a[0]) * k, z = a[1] + (b[1] - a[1]) * k;
+  const k = w.along / len, ax = -(b[1] - a[1]) / len, az = (b[0] - a[0]) / len, x = a[0] + (b[0] - a[0]) * k + ax * (w.aside ?? 0), z = a[1] + (b[1] - a[1]) * k + az * (w.aside ?? 0);
   w.y += (heightAt(x, z, w.y) - w.y) * Math.min(1, dt * 10); // 上下台阶时平滑过渡
   w.fig.root.position.set(x, w.y, z);
   const heading = Math.atan2(b[0] - a[0], b[1] - a[1]);
@@ -141,7 +159,8 @@ function stepWalker(w: Walker, dt: number) {
 }
 
 const TRACK_MID = (TRACK.inner + TRACK.outer) / 2;
-function stepJogger(j: Jogger, dt: number) {
+function stepJogger(j: Jogger, dt: number, near?: { x: number; z: number }) {
+  if (close(j.fig, near)) { j.fig.pose(j.phase, 0); return; }
   const r = rad(j.a, TRACK_MID);
   j.a += j.dir * (SPEED.jog / r) * dt;
   if (j.a > JOG_ARC.to) j.dir = -1;
@@ -199,8 +218,9 @@ function createDog(mats: Materials, group: THREE.Group, master: Walker, breed: D
 
 /** 登山的人：沿石阶走到山顶，在瞭望亭停一会儿再下山。 */
 const HIKE = { speed: 0.75, topPause: 6, bottomPause: 4 } as const;
-function stepHiker(h: Hiker, dt: number) {
+function stepHiker(h: Hiker, dt: number, near?: { x: number; z: number }) {
   if (TRAIL.length < 2) return;
+  if (close(h.fig, near)) { h.fig.pose(h.phase, 0); return; }
   if (h.pause > 0) { h.pause -= dt; h.fig.pose(h.phase, 0); return; }
   const a = TRAIL[Math.floor(h.i)], b = TRAIL[Math.min(TRAIL.length - 1, Math.floor(h.i) + 1)];
   const seg = Math.max(0.2, a.distanceTo(b));
@@ -239,7 +259,7 @@ export function createResidents(mats: Materials, count = ROLES.length) {
     const made = spawn(mats, role, i, out);
     group.add(made.fig.root);
     rod = made.rod ?? rod;
-    actors.push({ name: role.name, say: role.say, root: made.fig.root, hours: role.hours });
+    actors.push({ name: role.name, say: role.say, root: made.fig.root, fig: made.fig, hours: role.hours });
     shifts.push([role.hours, made.fig.root]);
   });
   // 邮差（第一个走路的人）带土狗；角色表里写了 dog 的自己牵狗
@@ -253,12 +273,13 @@ export function createResidents(mats: Materials, count = ROLES.length) {
     actors,
     /** 码头钓鱼的周伯：他的竿、竿梢和人（钓鱼小游戏借他的竿）。 */
     angler: angler ? { rod: angler, tip: angler.userData.tip as THREE.Object3D, root: angler.parent as THREE.Object3D } : null,
-    update(t: number, dt: number, hour: number) {
+    /** near：滑板小游戏里正在附近滑的人（可选；首页不传）。离他近的岛民停下来、往路边让一让。 */
+    update(t: number, dt: number, hour: number, near?: { x: number; z: number }) {
       // 不在作息时间里的人藏起来（照样往前走，回来时不会都挤在起点）
       for (const [h, root] of shifts) root.visible = onShift(h, hour);
-      for (const w of out.walkers) stepWalker(w, dt);
-      for (const j of out.joggers) stepJogger(j, dt);
-      for (const h of out.hikers) stepHiker(h, dt);
+      for (const w of out.walkers) stepWalker(w, dt, near);
+      for (const j of out.joggers) stepJogger(j, dt, near);
+      for (const h of out.hikers) stepHiker(h, dt, near);
       const r: THREE.Object3D | null = rod;
       if (r) r.rotation.x = 0.9 + Math.sin(t * 0.8) * 0.06;
       for (const d of dogs) d(t, dt);

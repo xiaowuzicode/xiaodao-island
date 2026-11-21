@@ -17,10 +17,16 @@ import { SATELLITES, buildTerrain } from '@/island/terrain';
 /** 路灯点光源的颜色、照射距离、衰减。 */
 const LAMP_LIGHT = { color: '#ffbf73', distance: 16, decay: 1.4 } as const;
 
-export function buildWorld(scene: THREE.Scene, mats: Materials, lampLightCount: number) {
+/**
+ * opts.noTrees：这些位置不种树（滑板小游戏给路线让道；首页不传，行为不变）。
+ * opts.grassEdge：改主岛草地那一层的轮廓（小岛邮差在码头台阶、木梯处开口子；首页不传，行为不变）。
+ * opts.upperEdge：改上层台地那一层的轮廓（小岛邮差在主台阶处开口子；首页不传，行为不变）。
+ * opts.skipMeadow：这些位置不摆花丛草丛（小岛邮差给口子让开；首页不传，行为不变）。
+ */
+export function buildWorld(scene: THREE.Scene, mats: Materials, lampLightCount: number, opts: { noTrees?: (x: number, z: number) => boolean; grassEdge?: (pts: [number, number][]) => [number, number][]; upperEdge?: (pts: [number, number][]) => [number, number][]; skipMeadow?: (x: number, z: number) => boolean } = {}) {
   const world = new THREE.Group();
   scene.add(world);
-  buildTerrain(mats, world);
+  buildTerrain(mats, world, { grassEdge: opts.grassEdge, upperEdge: opts.upperEdge });
   buildRoads(mats, world);
   press(mats, world);
   keeper(mats, world);
@@ -36,10 +42,10 @@ export function buildWorld(scene: THREE.Scene, mats: Materials, lampLightCount: 
   buildVillage(mats, world);
   buildMarket(mats, world);
   const lh = lighthouse(mats, world);
-  forest(mats, world);
+  forest(mats, world, opts.noTrees);
   pier(mats, world);
   // 路灯都会在夜里发光；只有最靠近码头的几盏挂真光源（点光源对每个像素都有开销）
-  const lampLights = buildDecor(mats, world).slice(0, lampLightCount).map((p) => {
+  const lampLights = buildDecor(mats, world, { skipMeadow: opts.skipMeadow }).slice(0, lampLightCount).map((p) => {
     const l = new THREE.PointLight(LAMP_LIGHT.color, 0, LAMP_LIGHT.distance, LAMP_LIGHT.decay);
     l.position.copy(p);
     world.add(l);

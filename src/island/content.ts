@@ -68,7 +68,7 @@ export const PLACES: Place[] = [
       lede: '岛上的主角。夜里亮灯，光束会停在最近更新的地方。现在照着的是：',
       items: [
         ...(latestPost(d) ? [{ label: latestPost(d).title, sub: `新文章 · ${latestPost(d).date}`, url: latestPost(d).url }] : []),
-        ...(d.daily ? [{ label: `日报第 ${d.daily.issueNo} 期 · ${d.daily.count} 条信号`, sub: d.daily.date, url: d.daily.url }] : []),
+        ...(d.daily ? [{ label: `日报第 ${d.daily.issueNo} 期 · ${d.daily.count} 条信号`, sub: d.daily.date, url: d.daily.url }] : []),        { label: '免费领《Claude Code 实战手册》v2', sub: '18 章 + 配置包 · 前 10 章可直接读', url: '/handbook/' },
       ],
     }),
   },
@@ -95,10 +95,11 @@ export const PLACES: Place[] = [
       image: { src: WECHAT_QR, alt: '公众号「小岛AI」二维码', caption: '微信扫码关注公众号「小岛AI」', size: 180 },
       items: [
         { label: 'B 站关注「胖胖不胖的AI小岛」', sub: '彩铅动画、新课预告', url: LINKS.bilibili },
+        { label: '领《Claude Code 实战手册》v2', sub: '18 章 + 配置包 · 公众号回复 CC', url: '/handbook/' },
         { label: 'RSS 订阅', sub: '用阅读器收新文章 · /rss.xml', url: '/rss.xml' },
       ],
       cta: { label: '去 B 站关注', url: LINKS.bilibili, external: true },
-      links: [{ label: '认识岛主', url: '/about/' }, { label: '给 AI 读的站点说明', url: '/llms.txt' }],
+      links: [{ label: '认识岛主', url: '/about/' }, { label: 'pdd.bot 模板库', url: 'https://pdd.bot/zh/' }, { label: '给 AI 读的站点说明', url: '/llms.txt' }],
     }),
   },
   {

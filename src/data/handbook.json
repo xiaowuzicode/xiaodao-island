@@ -1,0 +1,20 @@
+[
+ {
+  "slug": "ch01",
+  "no": "01",
+  "title": "示例章节：把这里换成你的手册",
+  "sub": "SAMPLE",
+  "desc": "示例章节。真实网站的手册正文不在开源仓库里，换成你自己的内容。",
+  "html": "<p>这是一份示例章节。<b>src/data/handbook.json</b> 里每一项是一章：slug 是网址，no 是章号（数字是第几章，字母是附录），html 是正文。</p>\n<h3 class=\"buoy\">怎么换成你的</h3>\n<p>把你的文章按章写进这个文件，构建时会为每一章生成一页 <b>/handbook/&lt;slug&gt;/</b>，并在文章和日报末尾出现领取条。</p>",
+  "chars": 203
+ },
+ {
+  "slug": "appendix-a",
+  "no": "A",
+  "title": "示例附录",
+  "sub": "SAMPLE",
+  "desc": "示例附录。",
+  "html": "<p>附录的 no 写字母，页面上显示成「附录 A」。</p>",
+  "chars": 31
+ }
+]

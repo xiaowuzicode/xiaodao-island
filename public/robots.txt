@@ -1,5 +1,7 @@
 # 小岛AI · xiaodao.ai：欢迎搜索引擎和 AI 检索抓取全部公开内容
 User-agent: *
 Allow: /
+# 手册和配置包的下载文件不进索引，领取入口是 /handbook/
+Disallow: /handbook/dl/
 
 Sitemap: https://xiaodao.ai/sitemap-index.xml

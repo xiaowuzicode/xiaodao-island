@@ -1,0 +1,175 @@
+---
+import Base from '@/layouts/Base.astro';
+import PageHero from '@/components/PageHero.astro';
+
+// 个人微信二维码（只留码本身，不带昵称和头像）。留空时「进资料群」这一块不显示。
+const PERSONAL_QR = '/handbook/wechat-personal.jpg';
+
+// 前 10 章在本站有网页版；后 8 章的原文在 pdd.bot
+const PART1 = [
+  ['01', '第一天就把地基打好'],
+  ['02', '上下文是唯一的货币'],
+  ['03', '先规划，再动手'],
+  ['04', '让它像同事一样用 Git'],
+  ['05', 'worktree，一个人同时推三条线'],
+  ['06', 'Subagent 派活的艺术'],
+  ['07', 'Skills，把流程固化成肌肉记忆'],
+  ['08', '自动化三件套'],
+  ['09', '别信它说「完成了」'],
+  ['10', '翻车博物馆'],
+].map(([no, t]) => [no, t, `/handbook/ch${no}/`]);
+const PART2 = [
+  ['11', '规则文件只放硬纪律', 'rules-file'],
+  ['12', '写了 skill，它却没想起来用', 'skill-description'],
+  ['13', '开工前，先核对五要素', 'five-point-check'],
+  ['14', '待否决的决定', 'veto-list'],
+  ['15', '收尾汇报，写给没看过程的人', 'handoff-report'],
+  ['16', '只写在回复里的待办，等于没有', 'ledger'],
+  ['17', '让脚本读 PR 描述', 'pr-body-check'],
+  ['18', '长会话里的定时评审', 'periodic-review'],
+].map(([no, t, slug]) => [no, t, `https://pdd.bot/zh/library/${slug}/`]);
+const KIT = [
+  ['CLAUDE.md', '规则文件骨架，只放每次都必须遵守的硬纪律'],
+  ['rules-snippets.md', '六段规矩：长任务开场、待否决的决定、收尾汇报、待办、PR 描述、周期评审'],
+  ['pull_request_template.md', '带验证、风险、回滚三段的 PR 模板'],
+  ['pr_body_lint.py', '检查 PR 描述的脚本，附 GitHub Actions 配置'],
+  ['8 个 skill', '写规格、按规格实现、先写失败测试、排查 bug、提 PR 前自查、复盘、前端设计、改掉 AI 腔'],
+  ['reviewer.md', '做代码评审的 subagent 定义'],
+  ['DECISIONS / HANDOFF / ledger', '决定清单、收尾汇报、待办条目三份模板'],
+];
+const PREVIEWS = [
+  ['cover', '封面'],
+  ['toc', '目录'],
+  ['ch09', '第 9 章 别信它说「完成了」'],
+  ['ch14', '第 14 章 待否决的决定'],
+];
+---
+
+<Base
+  title="Claude Code 实战手册 v2 · 小岛AI"
+  description="18 章、5 起真实事故复盘，外加一个能直接解压进仓库的配置包：规则文件、8 个 skill、PR 检查脚本。关注公众号「小岛AI」回复 CC 免费领。"
+>
+  <PageHero
+    place="岛上资料室 · HANDBOOK"
+    title="Claude Code 实战手册 v2"
+    desc="18 章、5 起真实事故复盘，外加一个能直接解压进仓库的配置包。免费领。"
+  />
+
+  <div class="hb-grid">
+    <section class="panel">
+      <h2 class="panel-h">这本手册讲什么 <span class="en">WHAT'S INSIDE</span></h2>
+      <div class="panel-b">
+        <p>
+          我的日常工作是给大模型搭脚手架，每天用 Claude Code 交付生产代码。这本手册不讲安装和入门，讲的是怎么让一个 AI
+          编程 agent 稳定地、可验证地把活干完。
+        </p>
+        <p>
+          前十章是你坐在终端前盯着它干活的用法：上下文怎么管、先出计划再动手、worktree 并行、怎么验证它说的「完成了」。后八章是
+          v2 新加的，讲人不在场的长任务：睡前丢一句话，第二天早上看结果，中间需要哪些规矩。
+        </p>
+        <ul class="hb-previews">
+          {
+            PREVIEWS.map(([name, label]) => (
+              <li>
+                <a href={`/handbook/${name}.webp`} target="_blank" rel="noopener">
+                  <img src={`/handbook/${name}.webp`} alt={`手册内页：${label}`} width="910" height="1287" loading="lazy" decoding="async" />
+                  <span>{label}</span>
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </section>
+
+    <div class="stack">
+      <section class="panel" id="get">
+        <h2 class="panel-h">怎么领 <span class="en">GET IT</span></h2>
+        <div class="panel-b">
+          <ol class="hb-steps">
+            <li>微信关注公众号「小岛AI」。电脑上扫下面的码，手机上长按识别，或者在微信里直接搜「小岛AI」。</li>
+            <li>在公众号对话框里回复 <b class="hb-key">CC</b>。</li>
+            <li>收到手册 PDF 和配置包的下载地址。</li>
+          </ol>
+          <img class="qr" src="/island/wechat-qr.jpg" width="180" height="180" alt="公众号「小岛AI」二维码" loading="lazy" />
+          <p class="hb-fine">手册会继续更新，新版本也发在公众号里。</p>
+        </div>
+      </section>
+
+      {
+        PERSONAL_QR && (
+          <section class="panel">
+            <h2 class="panel-h">进资料群 <span class="en">GROUP</span></h2>
+            <div class="panel-b">
+              <p>加我微信，备注「手册」，我拉你进群。群里不闲聊，每天一条 AI 日报，手册和配置包有更新会先发在群里。</p>
+              <img class="qr" src={PERSONAL_QR} width="180" height="180" alt="岛主的微信二维码" loading="lazy" />
+            </div>
+          </section>
+        )
+      }
+    </div>
+  </div>
+
+  <section class="panel hb-block">
+    <h2 class="panel-h">十八章目录 <span class="en">CONTENTS</span></h2>
+    <div class="panel-b hb-toc">
+      <div>
+        <h3>第一部分 · 盯着它干活</h3>
+        <ol>{PART1.map(([no, t, href]) => <li><span>{no}</span><a href={href}>{t}</a></li>)}</ol>
+      </div>
+      <div>
+        <h3>第二部分 · 让它自己跑长任务 <em>v2 新增</em></h3>
+        <ol>{PART2.map(([no, t, href]) => <li><span>{no}</span><a href={href} target="_blank" rel="noopener">{t} ↗</a></li>)}</ol>
+        <p class="hb-fine">前 10 章可以直接在这里读，后 8 章的原文在 pdd.bot。附录：<a href="/handbook/appendix-a/">命令速查</a>、<a href="/handbook/appendix-b/">我的配置模板</a>。完整 PDF 和配置包走上面的领取方式。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel hb-block">
+    <h2 class="panel-h">配置包里有什么 <span class="en">STARTER KIT</span></h2>
+    <div class="panel-b">
+      <p>一个 zip，解压以后把需要的文件拷进你的仓库就能用。用 Codex 的把 CLAUDE.md 的内容放进 AGENTS.md，其余一样。</p>
+      <ul class="hb-kit">
+        {KIT.map(([file, use]) => <li><code>{file}</code><span>{use}</span></li>)}
+      </ul>
+      <p class="hb-fine">
+        每个文件的讲解和在线版在 <a href="https://pdd.bot/zh/" target="_blank" rel="noopener">pdd.bot ↗</a>。六个工程 skill
+        的分工参考了 mattpocock/skills，正文是更短的重写版本。
+      </p>
+      <p><a class="hb-cta" href="#get">去领取 ↑</a></p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .hb-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  .hb-grid .stack { display: grid; gap: 16px; align-content: start; }
+  .hb-block { margin-top: 16px; }
+  .hb-previews { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .hb-previews a { display: grid; gap: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+  .hb-previews a:hover { text-decoration: none; color: var(--ink); }
+  .hb-previews img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #fffaf3; }
+  .hb-steps { margin: 0 0 4px; padding-left: 1.3em; line-height: 1.9; }
+  .hb-steps li { margin-bottom: 6px; }
+  .hb-key { padding: 1px 9px; border-radius: 8px; background: var(--pick); color: var(--pick-ink); font-family: var(--font-mono); }
+  .hb-fine { margin-top: 12px !important; color: var(--muted); font-size: 13px; }
+  .hb-toc { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 32px; }
+  .hb-toc h3 { margin: 6px 0 8px; color: var(--ink); font-size: 14.5px; }
+  .hb-toc h3 em { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--accent); font-size: 11.5px; font-style: normal; font-weight: 600; }
+  .hb-toc ol { list-style: none; margin: 0; padding: 0; }
+  .hb-toc li { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); line-height: 1.6; }
+  .hb-toc li a { color: var(--ink); }
+  .hb-toc li span { flex-shrink: 0; color: var(--accent); font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .hb-kit { list-style: none; margin: 4px 0 0; padding: 0; }
+  .hb-kit li { display: grid; grid-template-columns: minmax(0, 15em) minmax(0, 1fr); gap: 4px 16px; padding: 9px 0; border-bottom: 1px solid var(--line); line-height: 1.7; }
+  .hb-kit code { justify-self: start; padding: 1px 8px; border-radius: 8px; background: var(--code-bg); color: var(--ink); font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; }
+  .hb-cta { display: inline-block; margin-top: 6px; padding: 9px 18px; border-radius: 12px; background: var(--pick); color: var(--pick-ink); font-weight: 600; }
+  .hb-cta:hover { text-decoration: none; opacity: 0.92; }
+  @media (max-width: 860px) {
+    .hb-grid, .hb-toc { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .hb-previews { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .hb-kit li { grid-template-columns: 1fr; }
+  }
+</style>

@@ -199,6 +199,9 @@ img { max-width: 100%; height: auto; }
 .follow-card { max-width: 720px; margin: 0 auto 36px; padding: 18px 22px; }
 .follow-card .title { margin: 0 0 6px; color: var(--ink); font-size: 16px; font-weight: 700; }
 .follow-card p { margin: 0; color: var(--muted); font-size: 14px; }
+.follow-card .follow-cta { display: inline-block; margin: 12px 0; padding: 8px 16px; border-radius: 12px; background: var(--pick); color: var(--pick-ink); font-weight: 600; }
+.follow-card .follow-cta:hover { text-decoration: none; opacity: 0.92; }
+.follow-card .follow-fine { padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
 /* 公众号合集目录（文章页底部） */
 .series { max-width: 720px; margin: 0 auto 28px; padding: 18px 22px; }
 .series h2 { margin: 0 0 8px; color: var(--ink); font-size: 16px; }
@@ -240,6 +243,7 @@ img { max-width: 100%; height: auto; }
 .np-item .np-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .np-item .np-written { padding: 1px 8px; border-radius: 999px; background: var(--pick); color: var(--pick-ink); font-size: 11px; font-weight: 600; }
 .np-foot { padding: 28px 0 6px; text-align: center; color: var(--muted); font-size: 12px; letter-spacing: 0.2em; }
+.np-foot + .follow-card { margin-top: 16px; margin-bottom: 20px; }
 .np-back { margin: 10px 0 20px; text-align: center; }
 .np-back a { display: inline-block; padding: 9px 18px; border-radius: 12px; background: var(--chip); color: var(--ink); font-weight: 600; font-size: 14px; }
 .np-back a:hover { background: var(--pick); color: var(--pick-ink); text-decoration: none; }
@@ -259,6 +263,16 @@ img { max-width: 100%; height: auto; }
 .kv li { display: flex; gap: 12px; padding: 6px 0; }
 .kv li span { min-width: 5.5em; color: var(--muted); }
 .qr { display: block; margin-top: 12px; border-radius: 12px; background: #fff; padding: 6px; }
+.works { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.works a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); color: var(--ink); }
+.works a:hover { text-decoration: none; border-color: var(--line-2); background: var(--bg-2); }
+.works b { font-size: 15px; }
+.works small { grid-column: 1; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.works i { grid-row: 1 / span 2; grid-column: 2; color: var(--accent); font-style: normal; font-weight: 600; }
+.qr-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.qr-pair figure { margin: 0; text-align: center; }
+.qr-pair .qr { width: 100%; height: auto; margin-top: 0; }
+.qr-pair figcaption { margin-top: 6px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
 
 /* ── 课程与视频 ── */
 .block { margin: 0 0 26px; }
@@ -329,7 +343,7 @@ a.course:hover { text-decoration: none; border-color: var(--line-2); transform: 
   .brand { padding: 6px; }
   .site-nav { margin-left: auto; }
   .site-nav a { padding: 8px 10px; }
-  .site-nav a[data-key='7'], .site-nav a[data-key='5'] { display: none; }
+  .site-nav a[data-key='8'], .site-nav a[data-key='5'] { display: none; }
   .log li { grid-template-columns: 1fr; gap: 2px; }
   .log p { grid-column: 1; }
   .prose { font-size: 16px; }

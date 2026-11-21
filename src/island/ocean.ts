@@ -164,6 +164,10 @@ export function ocean(lite = false) {
   mesh.receiveShadow = true;
   mesh.userData.dynamic = true;
   let nextTap = 0;
+  const ripple = (x: number, z: number) => {
+    uniforms.uTaps.value[nextTap].set(x, z, uniforms.uTime.value, 0);
+    nextTap = (nextTap + 1) % TAP_RIPPLES;
+  };
   const floaters = floaterTracker(uniforms.uFloaters.value, uniforms.uWakes.value);
   return {
     mesh,
@@ -173,10 +177,11 @@ export function ocean(lite = false) {
     time: () => uniforms.uTime.value,
     /** 点了一下水面：荡开一圈涟漪，附近的鱼和鳐受惊窜开。 */
     tap(x: number, z: number) {
-      uniforms.uTaps.value[nextTap].set(x, z, uniforms.uTime.value, 0);
-      nextTap = (nextTap + 1) % TAP_RIPPLES;
+      ripple(x, z);
       startle(x, z, uniforms.uTime.value);
     },
+    /** 只荡开一圈涟漪，不惊动水下生物（钓鱼浮标被试探、轻轻晃时用）。 */
+    ripple,
     /** 调试用（?island-debug）：各种水下生物此刻的 [x, z, 朝向, 相位]。 */
     swimmers: () => Object.fromEntries([...SWIM_SLOTS.map(([, k]) => k), 'uDolphins' as const].map((k) =>
       [k, uniforms[k].value.map((v) => v.toArray())])),

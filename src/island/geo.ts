@@ -5,6 +5,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 /** 同色共享一个材质；合批时按材质分组，所以共享越多，绘制调用越少。 */
 export class Materials {
   private cache = new Map<string, THREE.MeshStandardMaterial>();
+  /** 新建材质时顺手调一下（邮差页给每个材质打弯曲补丁；首页、滑板页不设，等于没有）。 */
+  onCreate?: (m: THREE.MeshStandardMaterial) => void;
   /** 夜里会亮的窗玻璃，统一由时间系统调 emissiveIntensity。 */
   readonly window = new THREE.MeshStandardMaterial({ color: '#4f6d70', emissive: '#ffcf87', emissiveIntensity: 0, roughness: 0.4 });
   /** 路灯灯泡与灯塔灯笼。 */
@@ -21,6 +23,7 @@ export class Materials {
     if (!m) {
       m = new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...extra });
       this.cache.set(key, m);
+      this.onCreate?.(m);
     }
     return m;
   }

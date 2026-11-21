@@ -68,7 +68,8 @@ export function bench(mats: Materials, parent: THREE.Object3D, x: number, z: num
 }
 
 /** 草地上散落的花丛、草簇和小灌木（避开路和房子）。 */
-function meadow(mats: Materials, parent: THREE.Object3D) {
+/** skip：这些位置的花丛、草丛、灌木不摆（随机数照样取，别处摆的东西和不传时一模一样；小岛邮差给草地上的口子让开，首页不传）。 */
+function meadow(mats: Materials, parent: THREE.Object3D, skip?: (x: number, z: number) => boolean) {
   const rnd = seeded(91);
   const bloom = new THREE.SphereGeometry(0.13, 8, 6), stem = new THREE.ConeGeometry(0.08, 0.32, 5), bush = new THREE.SphereGeometry(0.5, 12, 9);
   let flowers = 0, tufts = 0, bushes = 0;
@@ -76,17 +77,18 @@ function meadow(mats: Materials, parent: THREE.Object3D) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 27, x = Math.cos(a) * r, z = Math.sin(a) * r;
     const y = groundY(x, z);
     if (y < GROUND || !inside(x, z, 0.84, 0, 0, 1.2) || !isClear(x, z) || nearTrail(x, z) || nearVillage(x, z)) continue;
-    const kind = rnd();
+    const kind = rnd(), keep = !skip?.(x, z);
     if (kind < 0.3 && flowers < 36) {
       flowers++;
       const c = P.flowers[Math.floor(rnd() * P.flowers.length)];
-      for (let k = 0; k < 5; k++) put(parent, bloom, mats.get(c), x + (rnd() - 0.5) * 0.7, y + 0.16, z + (rnd() - 0.5) * 0.7, { cast: false });
+      for (let k = 0; k < 5; k++) { const px = x + (rnd() - 0.5) * 0.7, pz = z + (rnd() - 0.5) * 0.7; if (keep) put(parent, bloom, mats.get(c), px, y + 0.16, pz, { cast: false }); }
     } else if (kind < 0.8 && tufts < 90) {
       tufts++;
-      for (let k = 0; k < 3; k++) put(parent, stem, mats.get(P.tree[k % 3]), x + (rnd() - 0.5) * 0.3, y + 0.15, z + (rnd() - 0.5) * 0.3, { cast: false }).rotation.z = (rnd() - 0.5) * 0.6;
+      for (let k = 0; k < 3; k++) { const px = x + (rnd() - 0.5) * 0.3, pz = z + (rnd() - 0.5) * 0.3, rz = (rnd() - 0.5) * 0.6; if (keep) put(parent, stem, mats.get(P.tree[k % 3]), px, y + 0.15, pz, { cast: false }).rotation.z = rz; }
     } else if (bushes < 26) {
       bushes++;
-      put(parent, bush, mats.get(P.tree[Math.floor(rnd() * 3)]), x, y + 0.25, z).scale.set(1, 0.7, 1);
+      const c = P.tree[Math.floor(rnd() * 3)];
+      if (keep) put(parent, bush, mats.get(c), x, y + 0.25, z).scale.set(1, 0.7, 1);
     }
   }
 }
@@ -175,11 +177,12 @@ function gazebo(mats: Materials, parent: THREE.Object3D) {
 }
 
 /** 返回灯笼位置（交给 world 决定其中几盏挂真光源）。 */
-export function buildDecor(mats: Materials, parent: THREE.Object3D) {
+/** opts.skipMeadow：这些位置不摆花丛草丛（小岛邮差页传，首页、滑板页不传，画面不变）。 */
+export function buildDecor(mats: Materials, parent: THREE.Object3D, opts: { skipMeadow?: (x: number, z: number) => boolean } = {}) {
   const lamps = lampPositions();
   for (const l of lamps) streetLamp(mats, parent, l.x, l.z, l.facing);
   for (const [x, z, rot] of BENCHES) bench(mats, parent, x, z, rot);
-  meadow(mats, parent);
+  meadow(mats, parent, opts.skipMeadow);
   beach(mats, parent);
   palms(mats, parent);
   gazebo(mats, parent);

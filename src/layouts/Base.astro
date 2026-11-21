@@ -33,8 +33,9 @@ const NAV = [
   { key: 3, href: '/archive/', label: '文章', match: (p: string) => p.startsWith('/archive/') || p.startsWith('/posts/') },
   { key: 4, href: '/daily/', label: '日报', match: (p: string) => p.startsWith('/daily/') && !p.startsWith('/daily/book') },
   { key: 5, href: '/daily/book/', label: '翻页册', match: (p: string) => p.startsWith('/daily/book') },
-  { key: 6, href: '/about/', label: '关于', match: (p: string) => p.startsWith('/about/') },
-  { key: 7, href: '/rss.xml', label: 'RSS', match: () => false },
+  { key: 6, href: '/handbook/', label: '手册', match: (p: string) => p.startsWith('/handbook/') },
+  { key: 7, href: '/about/', label: '关于', match: (p: string) => p.startsWith('/about/') },
+  { key: 8, href: '/rss.xml', label: 'RSS', match: () => false },
 ];
 // 分享卡片：文章有封面就用封面，没有就用小岛的 JPG 分享图（部分平台不认 WebP）
 const og = new URL(ogImage ?? '/island/og.jpg', Astro.site);
@@ -93,7 +94,7 @@ const og = new URL(ogImage ?? '/island/og.jpg', Astro.site);
     </footer>
 
     <script>
-      // 数字键 1-7 跳到对应栏目（输入框里不拦截）
+      // 数字键 1-8 跳到对应栏目（输入框里不拦截）
       document.addEventListener('keydown', (e) => {
         if (e.metaKey || e.ctrlKey || e.altKey) return;
         const t = e.target as HTMLElement | null;

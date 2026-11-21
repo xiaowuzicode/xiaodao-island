@@ -56,15 +56,19 @@ export function shoreDistance(x: number, z: number) {
   return best;
 }
 
-/** 一层台地：沿轮廓挤出，带圆角倒边，像一块压平的粘土饼。 */
-export function slab(mats: Materials, parent: THREE.Object3D, isle: Isle, scale: number, top: number, depth: number, color: string) {
+/** 一层台地：沿轮廓挤出，带圆角倒边，像一块压平的粘土饼。edge：改一改轮廓（小岛邮差给码头台阶在草地上开一道口子；首页不传）。 */
+export function slab(mats: Materials, parent: THREE.Object3D, isle: Isle, scale: number, top: number, depth: number, color: string, edge?: (pts: [number, number][]) => [number, number][]) {
   const n = 140, shape = new THREE.Shape();
+  let pts: [number, number][] = [];
   for (let i = 0; i <= n; i++) {
     const th = (i / n) * Math.PI * 2, r = rad(th, isle.s * scale, isle.k);
-    const x = isle.cx + r * Math.cos(th), z = isle.cz + r * Math.sin(th);
+    pts.push([isle.cx + r * Math.cos(th), isle.cz + r * Math.sin(th)]);
+  }
+  if (edge) pts = edge(pts);
+  pts.forEach(([x, z], i) => {
     if (i) shape.lineTo(x, -z);
     else shape.moveTo(x, -z);
-  }
+  });
   const bevel = 0.55;
   const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: 0.75, bevelSegments: 4 });
   g.rotateX(-Math.PI / 2);
@@ -111,11 +115,12 @@ function stairs(mats: Materials, parent: THREE.Object3D) {
   }
 }
 
-export function buildTerrain(mats: Materials, parent: THREE.Object3D) {
+/** opts.grassEdge / upperEdge：改主岛草地、上层台地那一层的轮廓（只有小岛邮差页传，首页、滑板页不变）。 */
+export function buildTerrain(mats: Materials, parent: THREE.Object3D, opts: { grassEdge?: (pts: [number, number][]) => [number, number][]; upperEdge?: (pts: [number, number][]) => [number, number][] } = {}) {
   const rnd = seeded(772);
   slab(mats, parent, MAIN, 1, LEVEL.sand, 1.4, P.sand);
-  slab(mats, parent, MAIN, 0.84, LEVEL.grass, 1.4, P.grass);
-  slab(mats, parent, { cx: UPPER.cx, cz: UPPER.cz, s: UPPER.s, k: 0 }, 1, LEVEL.upper, 2.6, P.upper);
+  slab(mats, parent, MAIN, 0.84, LEVEL.grass, 1.4, P.grass, opts.grassEdge);
+  slab(mats, parent, { cx: UPPER.cx, cz: UPPER.cz, s: UPPER.s, k: 0 }, 1, LEVEL.upper, 2.6, P.upper, opts.upperEdge);
   for (const isle of Object.values(SATELLITES)) {
     slab(mats, parent, isle, 1, SATELLITE_LEVEL.sand, 1.2, P.sand);
     slab(mats, parent, isle, 0.78, SATELLITE_LEVEL.grass, 1.2, P.grass);

@@ -20,7 +20,7 @@
 | ![浅海近景：鳐鱼游过水草、礁石和沙纹](docs/images/ocean-life.jpg) | ![黄昏小岛：灯塔照向海面，岸边灯光亮起](docs/images/island-dusk.jpg) |
 | 海水颜色、折射、沙纹、水草和游动的鱼，都由代码绘制。海水入口：[ocean-glsl.ts](src/island/ocean-glsl.ts)。 | 岛上有昼夜变化、灯塔和海浪声。相关实现都在 [src/island/](src/island/)。 |
 
-## 两个小游戏
+## 四个小游戏
 
 | 码头钓鱼 | 啪！拍蚊子 |
 |---|---|
@@ -32,6 +32,13 @@
 ![拍蚊子结束画面：得分、最高连击和「去 B站 玩，能上排行榜」](docs/images/mosquito-end.jpg)
 
 做这个游戏和上架 Toy 的过程，B 站有一支视频：[《B站点开就能玩的小游戏是怎么做的？拆完我也用 AI 做了一个》](https://www.bilibili.com/video/BV1hP4n6LEHo/)。
+
+| 滑板环岛 | 小岛邮差 |
+|---|---|
+| ![滑板环岛：长出翅膀，从彩虹底下飞过去](docs/images/skate.jpg) | ![小岛邮差：码头上，邮差把六封信交给少年](docs/images/postman.jpg) |
+| 踩着滑板绕岛一圈：逛岛、挑战、自由滑三种玩法，路上收金币、找彩铅，半路长出翅膀飞上云，还能骑龙。[在线玩](https://xiaodao.ai/play/skate/) · [B站 Toy](https://www.bilibili.com/toy/huaban/index.html) · [视频](https://www.bilibili.com/video/BV1k8W667EaZ/)。代码在 [src/island/skate/](src/island/skate/)。 | 替邮差送一天信：六封信、六位岛民，人不在原地等——问路，或者拨一拨岛上的钟等他出门。地平线是弯的，像一颗小星球。[在线玩](https://xiaodao.ai/play/walk/) · [B站 Toy](https://www.bilibili.com/toy/youchai/index.html) · [视频](https://www.bilibili.com/video/BV12TsB6EEav/)。代码在 [src/island/walk/](src/island/walk/)。 |
+
+岛上住着 64 个人，每个人按自己的日程过一天（上班、买菜、上课、钓鱼、逛夜市）；首页右下角的钟可以拖、可以快进。邮差里找人、问路靠的就是这份日程：[crowd-plan.ts](src/island/crowd-plan.ts)。
 
 ## 跑起来
 
@@ -51,6 +58,7 @@ bun run build      # 产物在 dist/
 | 文章里的图片 | `public/posts/<文章文件名>/images/` |
 | 日报（一天一个 JSON） | `src/data/daily/` |
 | B 站视频列表 | `src/data/videos.json`，封面在 `public/videos/` |
+| 手册（每章一项，生成 `/handbook/<slug>/`） | `src/data/handbook.json`，领取页的二维码在 `public/handbook/` |
 | 站点地址、关于页、图标 | `astro.config.mjs` 的 `site`、`src/pages/about.astro`、`public/` 下的图标 |
 | 给 AI 爬虫看的站点说明 | `public/llms.txt` |
 
@@ -61,6 +69,9 @@ bun run build      # 产物在 dist/
 | `src/island/` | 3D 小岛：地形、海水着色器（`ocean-glsl.ts`）、鱼群、灯塔、昼夜、镜头 |
 | `src/island/fishing.ts`、`fishing-gear.ts` | 码头钓鱼小游戏：甩竿、鱼影、咬钩、收进鱼桶；贝壳升级鱼线 / 鱼饵 / 手感（进度存在浏览器里） |
 | `public/play/mosquito/` | 拍蚊子小游戏：单个 HTML，在 B站 Toy 里自动接排行榜 |
+| `src/island/skate/` | 滑板环岛：路线、镜头、翅膀和龙、挑战计分（`bun run check:skate` 查路线） |
+| `src/island/walk/` | 小岛邮差：走路、找路、弯曲地平线、问路和拨钟、送信（`bun run check:walk` 跑整套检查） |
+| `src/island/crowd-plan.ts`、`crowd.ts` | 64 个岛民的日程和走路 |
 | `src/pages/` | 页面：首页、文章、日报、专题、视频、归档 |
 | `src/lib/topics.ts` | 专题：按标题和摘要里的关键词自动归类 |
 

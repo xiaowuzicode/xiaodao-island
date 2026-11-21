@@ -1,0 +1,93 @@
+---
+import Base from '@/layouts/Base.astro';
+import HandbookCta from '@/components/HandbookCta.astro';
+import chapters from '@/data/handbook.json';
+
+export function getStaticPaths() {
+  return chapters.map((c, i) => ({ params: { slug: c.slug }, props: { c, prev: chapters[i - 1], next: chapters[i + 1] } }));
+}
+const { c, prev, next } = Astro.props;
+const label = /^\d+$/.test(c.no) ? `第 ${Number(c.no)} 章` : `附录 ${c.no}`;
+---
+
+<Base title={`${c.title} · Claude Code 实战手册`} description={c.desc} ogType="article">
+  <article>
+    <header class="post-header">
+      <p class="crumb"><a href="/">小岛</a> / <a href="/handbook/">Claude Code 实战手册</a> / {label}</p>
+      <h1>{c.title}</h1>
+      <div class="meta"><span>小岛AI</span><span class="sep"></span><span>{label} · {c.sub}</span></div>
+    </header>
+    <div class="prose hbk" set:html={c.html} />
+    <HandbookCta>
+      这是手册的网页版。完整的 18 章 PDF 和配置包一起领。<a href="/handbook/">看全书目录</a>。
+    </HandbookCta>
+    <nav class="post-nav" aria-label="相邻章节">
+      {prev ? <a href={`/handbook/${prev.slug}/`}><small>上一章</small>{prev.title}</a> : <a href="/handbook/"><small>目录</small>全书 18 章</a>}
+      {next ? <a href={`/handbook/${next.slug}/`}><small>下一章</small>{next.title}</a> : <a href="https://pdd.bot/zh/library/rules-file/" target="_blank" rel="noopener"><small>第 11 章起 ↗</small>规则文件只放硬纪律</a>}
+    </nav>
+  </article>
+</Base>
+
+<style is:global>
+  /* 手册正文里的版式组件，类名沿用 PDF 版 */
+  .hbk h3.buoy { margin: 1.9em 0 0.5em; }
+  .hbk .u, .hbk .u2 { font-weight: 600; color: var(--ink); border-bottom: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); }
+  .hbk .hl { padding: 1px 6px; border-radius: 6px; background: var(--quote); font-weight: 600; color: var(--ink); }
+  .hbk .term { padding: 1px 8px; border-radius: 999px; background: var(--chip); color: var(--pick); font-weight: 600; }
+  .hbk .note, .hbk .reef, .hbk .tip { margin: 1.4em 0; padding: 12px 16px; border-radius: 0 12px 12px 0; background: var(--quote); border-left: 3px solid var(--pick); font-size: 15.5px; }
+  .hbk .reef { border-left-color: var(--accent); }
+  .hbk .tip { display: flex; gap: 10px; align-items: flex-start; }
+  .hbk .note p, .hbk .reef p, .hbk .tip p { margin: 4px 0 0; }
+  .hbk .tag { margin-right: 8px; padding: 1px 9px; border-radius: 999px; background: var(--pick); color: var(--pick-ink); font-size: 12px; font-weight: 700; white-space: nowrap; }
+  .hbk .reef .tag { background: var(--accent); }
+  .hbk .note .t, .hbk .reef .t { font-weight: 700; color: var(--ink); }
+  .hbk .route { margin: 1em 0; }
+  .hbk .route .cap { display: inline-block; padding: 2px 12px; border-radius: 999px; background: var(--chip); color: var(--ink); font-size: 14.5px; font-weight: 700; }
+  .hbk .route p { margin: 4px 0 0; }
+  .hbk .routes2col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+  .hbk .steps { margin: 1.2em 0; }
+  .hbk .step { display: flex; gap: 14px; }
+  .hbk .step .rail { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+  .hbk .step .no { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--pick); color: var(--pick-ink); font-size: 13px; font-weight: 700; }
+  .hbk .step .bar { flex: 1; width: 2px; min-height: 16px; margin-top: 4px; background: var(--line-2); }
+  .hbk .step .body { padding-bottom: 10px; }
+  .hbk .step .body p { margin: 0; }
+  .hbk .step .body .h { font-weight: 700; color: var(--ink); }
+  .hbk .tide { display: flex; gap: 10px; align-items: stretch; margin: 1.4em 0; }
+  .hbk .tide .side { flex: 1; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); text-align: center; }
+  .hbk .tide .dark { background: var(--pick); border-color: var(--pick); color: var(--pick-ink); }
+  .hbk .tide p { margin: 0; }
+  .hbk .tide .h { font-weight: 700; }
+  .hbk .tide .s { font-size: 14px; opacity: 0.85; }
+  .hbk .tide .vs { display: flex; align-items: center; color: var(--accent); font-weight: 700; }
+  .hbk .lighthouse { margin: 1.8em 0; text-align: center; }
+  .hbk .lighthouse .row { display: none; }
+  .hbk .lighthouse .q { margin: 0; color: var(--ink); font-size: 18px; font-weight: 700; line-height: 1.8; }
+  .hbk .divider { display: none; }
+  .hbk .cheatsheet { margin: 2em 0 0; border: 1.5px solid var(--pick); border-radius: 14px; overflow: hidden; }
+  .hbk .cheatsheet .head { display: flex; justify-content: space-between; align-items: center; padding: 7px 16px; background: var(--pick); color: var(--pick-ink); }
+  .hbk .cheatsheet .head .t { font-weight: 700; font-size: 14px; }
+  .hbk .cheatsheet .head .e { font-size: 11px; letter-spacing: 0.14em; opacity: 0.7; }
+  .hbk .cheatsheet ul { margin: 0; padding: 10px 16px 12px 34px; font-size: 15.5px; }
+  .hbk .incident { margin: 1.2em 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+  .hbk .incident .head { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--quote); border-bottom: 1px solid var(--line); }
+  .hbk .incident .head .no { padding: 1px 10px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+  .hbk .incident .head .t { color: var(--ink); font-weight: 700; }
+  .hbk .incident .row { display: flex; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); font-size: 15.5px; }
+  .hbk .incident .row:last-child { border-bottom: 0; }
+  .hbk .incident .row .k { flex-shrink: 0; color: var(--muted); font-size: 13px; font-weight: 700; padding-top: 3px; }
+  .hbk .incident .row p { margin: 0; }
+  .hbk .incident .row.rule .k { color: var(--pick); }
+  .hbk figure.diagram { margin: 1.6em 0; padding: 12px; border-radius: 14px; background: #fffaf3; text-align: center; }
+  .hbk figure.diagram svg { max-width: 100%; height: auto; }
+  .hbk figure.diagram figcaption { margin-top: 6px; color: #98907f; font-size: 13px; }
+  .hbk table { width: 100%; margin: 1.4em 0; border-collapse: collapse; font-size: 15.5px; }
+  .hbk th, .hbk td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+  .hbk th { background: var(--chip); color: var(--ink); }
+  .hbk pre.light { border-left: 3px solid var(--accent); }
+  @media (max-width: 600px) {
+    .hbk .routes2col { grid-template-columns: 1fr; }
+    .hbk .tide { flex-direction: column; }
+    .hbk .tide .vs { justify-content: center; }
+  }
+</style>

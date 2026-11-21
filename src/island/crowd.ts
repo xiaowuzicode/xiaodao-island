@@ -24,6 +24,8 @@ const DETAIL = { near: 34, far: 40, desktop: 10, mobile: 4 } as const;
 const TURN_RATE = 8, JUMP = 2.5;
 /** 点人：离点击位置多少像素以内算点中；人比这个距离后面的东西近多少米以上才算没被挡住。 */
 const PICK_PX = 30, PICK_BEHIND = 2;
+/** 松开以后欠的时间按钟速的几成还（0.8：沿路以 1.8 倍步速追上日程）。 */
+const HOLD_PAYBACK = 0.8;
 
 const white = (g: THREE.BufferGeometry, gray = 1) => {
   const out = g.index ? g.toNonIndexed() : g.clone();
@@ -66,6 +68,8 @@ const lookOf = (p: Person): Look => ({
 
 export interface Crowd {
   group: THREE.Group;
+  /** 第 k 个人是花名册里的谁（ROSTER 的编号）。 */
+  readonly ids: readonly number[];
   /** 岛上现在有多少人在屋外。 */
   readonly outdoors: number;
   /** hour：岛上现在几点（0–24，带小数）；pace：每岛上分钟走多少米；t：动画时间；dt：真实秒（转身用）。 */
@@ -79,13 +83,28 @@ export interface Crowd {
   stateOf(i: number): State;
   /** 正在跟着看的人（一直用精细小人）；null 是不跟。 */
   follow(i: number | null): void;
+  /**
+   * 让第 i 个人站住、朝 facing（弧度）；facing 为 null 是松开（邮差页：被搭话的人站住听你说）。
+   * 做法是「欠时间」：被按住时他按「现在 − 欠的分钟」过日程，欠的跟着钟一起涨（所以正好停在原地）；松开后以 0.8 倍钟速还清
+   * （沿自己那条路以 1.8 倍步速追上去，不瞬移、不穿墙，追上以后和日程分毫不差）。首页不调它，欠的一直是 0，行为不变。
+   */
+  hold(i: number, facing: number | null): void;
+  /** 清掉所有人欠的时间（拨钟之后：人直接在新时刻该在的地方）。 */
+  clearHolds(): void;
+  /** 第 i 个人欠了几分钟（检查、调试用）。 */
+  lagOf(i: number): number;
   /** 这个人的卡片：一天的行程单。 */
   card(i: number): Card;
   /** 卡片第一行：现在几点、在干什么。 */
   nowLine(i: number, hour: number): string;
 }
 
-export function createCrowd(mats: Materials, opts: { mobile: boolean }): Crowd {
+/**
+ * opts.detail：最多同时几个精细小人（不传按电脑 / 手机的默认值；邮差页按画质档给）。
+ * opts.feet：脚下该落在多高（不传就是日程算出来的高度；邮差页传它让主台阶上的人踩在踏面上，而不是陷在台阶的斜面里）。
+ * opts.pack：远处的简单小人挤到实例数组前头、只画这么多个（在屋里的、换成精细小人的不占位子，三角形也不算）；邮差页用，不传和原来一样。
+ */
+export function createCrowd(mats: Materials, opts: { mobile: boolean; detail?: number; feet?: (x: number, z: number, y: number) => number; pack?: boolean }): Crowd {
   // 手机上只放花名册里标了 mobile 的那三分之一（日程还是按全员排的，位子不会变）
   const ids = ROSTER.filter((p) => !opts.mobile || p.mobile).map((p) => p.id), n = ids.length;
   const group = new THREE.Group();
@@ -107,23 +126,30 @@ export function createCrowd(mats: Materials, opts: { mobile: boolean }): Crowd {
   hands.instanceMatrix = arms.instanceMatrix;
 
   const color = new THREE.Color();
-  ids.forEach((id, k) => {
-    const p = ROSTER[id];
-    torso.setColorAt(k, color.set(p.shirt));
-    head.setColorAt(k, color.set(p.skin));
-    hair.setColorAt(k, color.set(p.hairColor));
-    hat.setColorAt(k, color.set(p.hat ?? '#ffffff'));
+  /** 第 j 个位子涂成第 k 个人的颜色。 */
+  const paint = (j: number, k: number) => {
+    const p = ROSTER[ids[k]];
+    torso.setColorAt(j, color.set(p.shirt));
+    head.setColorAt(j, color.set(p.skin));
+    hair.setColorAt(j, color.set(p.hairColor));
+    hat.setColorAt(j, color.set(p.hat ?? '#ffffff'));
     for (const side of [0, 1]) {
-      legs.setColorAt(k * 2 + side, color.set(p.pants));
-      arms.setColorAt(k * 2 + side, color.set(p.shirt));
-      hands.setColorAt(k * 2 + side, color.set(p.skin));
+      legs.setColorAt(j * 2 + side, color.set(p.pants));
+      arms.setColorAt(j * 2 + side, color.set(p.shirt));
+      hands.setColorAt(j * 2 + side, color.set(p.skin));
     }
-  });
+  };
+  ids.forEach((_id, k) => paint(k, k));
+  /** opts.pack：第 j 个位子现在是谁（-1 是空着）。 */
+  const owner = ids.map((_id, k) => k);
 
   const states = ids.map(() => blankState()), rots = ids.map(() => 0), last = ids.map(() => new THREE.Vector3());
   const figs: (Figure | null)[] = ids.map(() => null), detailed = ids.map(() => false), camDist = ids.map(() => Infinity);
-  const maxDetailed = opts.mobile ? DETAIL.mobile : DETAIL.desktop;
+  const maxDetailed = opts.detail ?? (opts.mobile ? DETAIL.mobile : DETAIL.desktop);
   let followed: number | null = null, outdoors = 0;
+  /** 欠的时间（岛上分钟）、按住时朝哪（null 是没按住）、上一帧的日程分钟（算钟走了多少）。 */
+  const lag = ids.map(() => 0), held: (number | null)[] = ids.map(() => null);
+  let lastMinute = NaN;
 
   const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
   const root = new THREE.Matrix4(), m = new THREE.Matrix4(), joint = new THREE.Matrix4(), rx = new THREE.Matrix4(), rz = new THREE.Matrix4();
@@ -148,17 +174,18 @@ export function createCrowd(mats: Materials, opts: { mobile: boolean }): Crowd {
     else pose.armL = pose.armR = Math.sin(w * 0.7) * 0.05;
   }
 
-  function writeInstanced(k: number, s: State, rot: number, scale: number) {
+  /** 第 k 个人画进第 j 个位子（不挤位子时 j 就是 k）。 */
+  function writeInstanced(k: number, s: State, rot: number, scale: number, j = k) {
     root.compose(pos.set(s.x, s.y, s.z), quat.setFromAxisAngle(UP, rot), scl.setScalar(scale));
-    torso.setMatrixAt(k, m.copy(root).multiply(joint.makeTranslation(0, pose.bodyY, 0)));
-    hat.setMatrixAt(k, ROSTER[ids[k]].hat ? m : ZERO);
+    torso.setMatrixAt(j, m.copy(root).multiply(joint.makeTranslation(0, pose.bodyY, 0)));
+    hat.setMatrixAt(j, ROSTER[ids[k]].hat ? m : ZERO);
     [pose.legL, pose.legR].forEach((a, side) => {
       joint.makeTranslation(side ? LEG.x : -LEG.x, LEG.y + pose.bodyY, 0);
-      legs.setMatrixAt(k * 2 + side, m.copy(root).multiply(joint).multiply(rx.makeRotationX(a)));
+      legs.setMatrixAt(j * 2 + side, m.copy(root).multiply(joint).multiply(rx.makeRotationX(a)));
     });
     [pose.armL, pose.armR].forEach((a, side) => {
       joint.makeTranslation(side ? ARM.x : -ARM.x, ARM.y + pose.bodyY, 0);
-      arms.setMatrixAt(k * 2 + side, m.copy(root).multiply(joint).multiply(rz.makeRotationZ(side ? ARM.splay : -ARM.splay)).multiply(rx.makeRotationX(a)));
+      arms.setMatrixAt(j * 2 + side, m.copy(root).multiply(joint).multiply(rz.makeRotationZ(side ? ARM.splay : -ARM.splay)).multiply(rx.makeRotationX(a)));
     });
   }
   function hideInstanced(k: number) {
@@ -203,13 +230,28 @@ export function createCrowd(mats: Materials, opts: { mobile: boolean }): Crowd {
 
   return {
     group,
+    ids,
     get outdoors() { return outdoors; },
     update(hour, pace, t, dt, camera) {
       const minute = toDayMinute(hour);
+      // 钟走了多少分钟（跨过 04:00 那一下按回绕算；一下跳了一个多小时是拨了钟，不记账）
+      let tick = Number.isNaN(lastMinute) ? 0 : minute - lastMinute;
+      if (tick < -720) tick += 1440;
+      if (tick < 0 || tick > 60) tick = 0;
+      lastMinute = minute;
       outdoors = 0;
       for (let k = 0; k < n; k++) {
-        const s = stateAt(ids[k], minute, pace, states[k]);
+        if (held[k] !== null) lag[k] += tick;
+        else if (lag[k] > 0) lag[k] = Math.max(0, lag[k] - tick * HOLD_PAYBACK);
+        const s = stateAt(ids[k], minute - lag[k], pace, states[k]);
+        const h = held[k];
+        if (h !== null && s.mode !== 'hidden') {
+          // 按住：走着的站住，转过来对着你；坐着的照旧坐着（只是不走了）
+          if (s.mode === 'walk') { s.mode = 'stand'; s.phase = 0; }
+          if (s.mode === 'stand') { s.rot = h; s.act = 'chat'; }
+        }
         if (s.mode === 'hidden') { camDist[k] = Infinity; continue; }
+        if (opts.feet && s.mode !== 'sit') s.y = opts.feet(s.x, s.z, s.y);
         outdoors++;
         camDist[k] = camera.position.distanceTo(v.set(s.x, s.y + 1, s.z));
         // 转身慢慢转；位置突然跳了（时间被拖动、刚出门）就直接朝过去
@@ -219,13 +261,23 @@ export function createCrowd(mats: Materials, opts: { mobile: boolean }): Crowd {
         rots[k] = jumped ? s.rot : rots[k] + d * Math.min(1, dt * TURN_RATE);
       }
       chooseDetailed();
+      let slot = 0, repaint = false;
       for (let k = 0; k < n; k++) {
         const s = states[k], f = figs[k];
-        if (s.mode === 'hidden') { hideInstanced(k); if (f) f.root.visible = false; continue; }
+        if (s.mode === 'hidden') { if (!opts.pack) hideInstanced(k); if (f) f.root.visible = false; continue; }
         const scale = Math.max(0.001, s.scale) * (ROSTER[ids[k]].kid ? KID_SCALE : 1);
         poseOf(s, t, ids[k] * 1.7);
-        if (detailed[k]) { hideInstanced(k); writeFigure(k, s, rots[k], scale); }
-        else { writeInstanced(k, s, rots[k], scale); if (f) f.root.visible = false; }
+        if (detailed[k]) { if (!opts.pack) hideInstanced(k); writeFigure(k, s, rots[k], scale); }
+        else if (opts.pack) {
+          if (owner[slot] !== k) { owner[slot] = k; paint(slot, k); repaint = true; }
+          writeInstanced(k, s, rots[k], scale, slot++);
+          if (f) f.root.visible = false;
+        } else { writeInstanced(k, s, rots[k], scale); if (f) f.root.visible = false; }
+      }
+      if (opts.pack) {
+        for (const im of [torso, head, hair, hat]) im.count = slot;
+        for (const im of [legs, arms, hands]) im.count = slot * 2;
+        if (repaint) for (const im of [torso, head, hair, hat, legs, arms, hands]) if (im.instanceColor) im.instanceColor.needsUpdate = true;
       }
       for (const im of [torso, hat, legs, arms]) im.instanceMatrix.needsUpdate = true;
     },
@@ -248,6 +300,9 @@ export function createCrowd(mats: Materials, opts: { mobile: boolean }): Crowd {
     person: (i) => ROSTER[ids[i]],
     stateOf: (i) => states[i],
     follow(i) { followed = i; },
+    hold(i, facing) { if (i >= 0 && i < n) held[i] = facing; },
+    clearHolds() { lag.fill(0); held.fill(null); lastMinute = NaN; },
+    lagOf: (i) => lag[i] ?? 0,
     card(i) {
       const p = ROSTER[ids[i]], home = p.home === 'ferry' ? '坐船来岛上玩一天' : '住在岛上';
       return {

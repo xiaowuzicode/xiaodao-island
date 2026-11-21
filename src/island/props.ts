@@ -62,13 +62,15 @@ function pickKind(y: number, r: number): TreeKind {
 /** 一共种多少棵树。 */
 const TREE_COUNT = 96;
 
-export function forest(mats: Materials, parent: THREE.Object3D) {
+/** avoid：这些位置不种树（滑板小游戏给路线让道用；首页不传）。 */
+export function forest(mats: Materials, parent: THREE.Object3D, avoid?: (x: number, z: number) => boolean) {
   const rnd = seeded(331);
   let placed = 0;
   for (let i = 0; i < 900 && placed < TREE_COUNT; i++) {
     const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 27, x = Math.cos(a) * r, z = Math.sin(a) * r, y = groundY(x, z);
     if (y < LEVEL.grass || !inside(x, z, 0.84, 0, 0, 1.6)) continue;
     if (!isClear(x, z, 0.8) || nearTrail(x, z) || nearVillage(x, z)) continue;
+    if (avoid?.(x, z)) continue;
     tree(mats, parent, x, z, y, rnd, 1, pickKind(y, rnd()));
     placed++;
   }

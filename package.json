@@ -9,7 +9,11 @@
     "preview": "astro preview",
     "check:island": "bun src/island/layout.check.ts",
     "check:crowd": "bun src/island/crowd-plan.check.ts",
-    "check:topics": "bun src/lib/topics.check.ts"
+    "check:fishing": "bun src/island/fishing-reel.check.ts",
+    "check:topics": "bun src/lib/topics.check.ts",
+    "check:skate": "bun src/island/skate/route.check.ts",
+    "check:skate-cam": "bun src/island/skate/camera.check.ts && bun src/island/skate/shake.check.ts",
+    "check:walk": "bun src/island/walk/walk.check.ts"
   },
   "dependencies": {
     "@astrojs/rss": "^4.0.10",
